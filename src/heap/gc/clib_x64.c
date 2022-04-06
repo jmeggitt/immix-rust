@@ -1,3 +1,4 @@
+#include <string.h>
 #include <inttypes.h>
 #include <stdlib.h>
 
