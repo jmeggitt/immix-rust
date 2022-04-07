@@ -1,3 +1,8 @@
+This project was forked from https://gitlab.anu.edu.au/mu/immix-rust and has been modified under the provided Apache 2.0
+license. Credit for the project goes to [Yi Lin](https://cecs.anu.edu.au/people/yi-lin) (The Australian National
+University). Please read their paper ([Free on ACM Digital Library](https://dl.acm.org/doi/abs/10.1145/3241624.2926707)
+or [PDF](http://users.cecs.anu.edu.au/~steveb/pubs/papers/rust-ismm-2016.pdf)).
+
 immix-rust
 ==========
 
