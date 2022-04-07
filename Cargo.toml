@@ -31,5 +31,5 @@ log = "0.4"
 crossbeam = "0.2.8"
 simple_logger = "2.1"
 
-[target."cfg(unix)".build-dependencies.gcc]
-version = "*"
+[build-dependencies]
+cc = "1.0.73"
