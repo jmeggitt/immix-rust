@@ -1,5 +1,6 @@
-use common::Address;
+use crate::common::Address;
 use std::sync::atomic::AtomicUsize;
+use lazy_static::lazy_static;
 
 pub mod immix;
 pub mod freelist;

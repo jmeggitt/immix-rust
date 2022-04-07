@@ -1,10 +1,8 @@
-extern crate libc;
-extern crate time;
 
-use heap;
-use heap::immix::ImmixMutatorLocal;
-use heap::immix::ImmixSpace;
-use heap::freelist::FreeListSpace;
+use crate::heap;
+use crate::heap::immix::ImmixMutatorLocal;
+use crate::heap::immix::ImmixSpace;
+use crate::heap::freelist::FreeListSpace;
 
 use std::sync::RwLock;
 
@@ -52,5 +50,5 @@ fn alloc_loop(mutator: &mut ImmixMutatorLocal) {
     
     let t_end = time::now_utc();
     
-    println!("time used: {} msec", (t_end - t_start).num_milliseconds());;
+    println!("time used: {} msec", (t_end - t_start).num_milliseconds());
 }

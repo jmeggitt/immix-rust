@@ -1,18 +1,18 @@
-extern crate time;
+use time;
 
-use heap;
-use heap::immix::ImmixMutatorLocal;
-use heap::immix::ImmixSpace;
-use heap::freelist::FreeListSpace;
-use common::ObjectReference;
+use crate::heap;
+use crate::heap::immix::ImmixMutatorLocal;
+use crate::heap::immix::ImmixSpace;
+use crate::heap::freelist::FreeListSpace;
+use crate::common::ObjectReference;
 
 use std::sync::RwLock;
 use std::sync::{Arc};
 use std::sync::atomic::Ordering;
 
-use exhaust::OBJECT_SIZE;
-use exhaust::OBJECT_ALIGN;
-use exhaust::ALLOCATION_TIMES;
+use crate::exhaust::OBJECT_SIZE;
+use crate::exhaust::OBJECT_ALIGN;
+use crate::exhaust::ALLOCATION_TIMES;
 
 const MARK_TIMES : usize = ALLOCATION_TIMES;
 
@@ -49,12 +49,11 @@ pub fn alloc_mark() {
 
 #[inline(never)]
 fn mark_loop(objs: Vec<ObjectReference>, shared_space: &Arc<ImmixSpace>) {
-    use objectmodel;
-    
+
     println!("Start marking");
     let t_start = time::now_utc();
     
-    let mark_state = objectmodel::MARK_STATE.load(Ordering::SeqCst) as u8;
+    let mark_state = crate::objectmodel::MARK_STATE.load(Ordering::SeqCst) as u8;
     
     let line_mark_table = shared_space.line_mark_table();
     let (space_start, space_end) = (shared_space.start(), shared_space.end());
@@ -65,7 +64,7 @@ fn mark_loop(objs: Vec<ObjectReference>, shared_space: &Arc<ImmixSpace>) {
         let obj = unsafe {*objs.get_unchecked(i)};
             
         // mark the object as traced
-        objectmodel::mark_as_traced(trace_map, space_start, obj, mark_state);
+        crate::objectmodel::mark_as_traced(trace_map, space_start, obj, mark_state);
         
         // mark meta-data
         if obj.to_address() >= space_start && obj.to_address() < space_end {

@@ -1,10 +1,13 @@
-use heap::immix;
-use heap::immix::ImmixSpace;
-use heap::immix::immix_space::ImmixBlock;
-use heap::gc;
+use crate::heap::immix;
+use crate::heap::immix::ImmixSpace;
+use crate::heap::immix::immix_space::ImmixBlock;
+use crate::heap::gc;
+use lazy_static::lazy_static;
+use log::trace;
 
-use common::LOG_POINTER_SIZE;
-use common::Address;
+
+use crate::common::LOG_POINTER_SIZE;
+use crate::common::Address;
 
 use std::*;
 use std::sync::Arc;

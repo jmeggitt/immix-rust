@@ -1,10 +1,10 @@
-extern crate time;
+use time;
 
-use heap;
-use heap::immix::ImmixMutatorLocal;
-use heap::immix::ImmixSpace;
-use heap::freelist::FreeListSpace;
-use common::Address;
+use crate::heap;
+use crate::heap::immix::ImmixMutatorLocal;
+use crate::heap::immix::ImmixSpace;
+use crate::heap::freelist::FreeListSpace;
+use crate::common::Address;
 
 pub const K : usize          = 4;
 pub const TREE_DEPTH : usize = 10; // 10

@@ -1,7 +1,7 @@
 use std::sync::atomic;
-pub static MARK_STATE : atomic::AtomicUsize = atomic::ATOMIC_USIZE_INIT;
+pub static MARK_STATE : atomic::AtomicUsize = atomic::AtomicUsize::new(0);
 
-use common::ObjectReference;
+use crate::common::ObjectReference;
 
 pub fn init() {
     MARK_STATE.store(1, atomic::Ordering::SeqCst);
@@ -16,8 +16,8 @@ pub fn flip_mark_state() {
     }
 }
 
-use common::Address;
-use common::LOG_POINTER_SIZE;
+use crate::common::Address;
+use crate::common::LOG_POINTER_SIZE;
 
 #[inline(always)]
 pub fn mark_as_traced(trace_map: *mut u8, space_start: Address, obj: ObjectReference, mark_state: u8) {

@@ -1,4 +1,3 @@
-extern crate libc;
 use self::libc::c_void;
 
 use heap::immix::ImmixMutatorLocal;

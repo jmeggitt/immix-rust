@@ -8,14 +8,14 @@ use std::sync::{Arc, RwLock};
 use std::sync::atomic::Ordering;
 use std::thread;
 
-use heap;
-use heap::immix::ImmixMutatorLocal;
-use heap::immix::ImmixSpace;
-use heap::freelist;
-use heap::freelist::FreeListSpace;
-use std::mem::size_of as size_of;
+use crate::heap;
+use crate::heap::immix::ImmixMutatorLocal;
+use crate::heap::immix::ImmixSpace;
+use crate::heap::freelist;
+use crate::heap::freelist::FreeListSpace;
+use std::mem::size_of;
 
-extern crate time;
+use time;
 
 const kStretchTreeDepth   : i32 = 18;
 const kLongLivedTreeDepth : i32 = 16;

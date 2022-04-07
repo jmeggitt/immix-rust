@@ -1,12 +1,6 @@
 #![allow(dead_code)]
 use std::sync::atomic::Ordering;
-
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-extern crate simple_logger;
-extern crate libc;
+use lazy_static::lazy_static;
 
 pub mod common;
 pub mod objectmodel;

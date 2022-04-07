@@ -1,18 +1,18 @@
-extern crate time;
+use time;
 
-use heap;
-use heap::immix::ImmixMutatorLocal;
-use heap::immix::ImmixSpace;
-use heap::freelist::FreeListSpace;
-use common::Address;
+use crate::heap;
+use crate::heap::immix::ImmixMutatorLocal;
+use crate::heap::immix::ImmixSpace;
+use crate::heap::freelist::FreeListSpace;
+use crate::common::Address;
 
 use std::sync::RwLock;
 use std::sync::{Arc};
 use std::sync::atomic::Ordering;
 
-use exhaust::OBJECT_SIZE;
-use exhaust::OBJECT_ALIGN;
-use exhaust::ALLOCATION_TIMES;
+use crate::exhaust::OBJECT_SIZE;
+use crate::exhaust::OBJECT_ALIGN;
+use crate::exhaust::ALLOCATION_TIMES;
 
 const INIT_TIMES : usize = ALLOCATION_TIMES;
 

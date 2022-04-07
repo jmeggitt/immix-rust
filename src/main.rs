@@ -2,11 +2,6 @@
 use std::env;
 use std::sync::atomic::Ordering;
 
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-
 mod common;
 mod objectmodel;
 mod heap;
@@ -24,7 +19,6 @@ fn init() {
 }
 
 fn main() {
-    use heap;
     init();
     
     match env::var("HEAP_SIZE") {

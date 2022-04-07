@@ -14,7 +14,7 @@ pub use self::address_map::AddressMap;
 pub const LOG_POINTER_SIZE : usize = 3;
 pub const POINTER_SIZE     : usize = 1 << LOG_POINTER_SIZE;
 
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash)]
 pub struct Address(usize);
 
@@ -131,6 +131,7 @@ impl fmt::Debug for Address {
     }
 }
 
+#[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash)]
 pub struct ObjectReference (usize);
 
@@ -197,8 +198,7 @@ pub fn lower_bits(value: u8, len: usize) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    extern crate libc;
-    
+
     #[test]
     pub fn test_u8_bits() {
         let value : u8 = 0b1100_0011;

@@ -1,7 +1,7 @@
-use common::Address;
-use heap::immix;
+use crate::common::Address;
+use crate::heap::{gc, immix};
 
-extern crate aligned_alloc;
+use aligned_alloc;
 
 use std::collections::LinkedList;
 use std::sync::Arc;
@@ -120,7 +120,6 @@ pub fn alloc_large(size: usize, align: usize, mutator: &mut immix::ImmixMutatorL
                 return addr;
             },
             None => {
-                use heap::gc;
                 gc::trigger_gc();
             }
         }

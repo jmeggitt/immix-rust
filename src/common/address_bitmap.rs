@@ -1,6 +1,6 @@
-use common::LOG_POINTER_SIZE;
-use common::Address;
-use common::bitmap::Bitmap;
+use crate::common::LOG_POINTER_SIZE;
+use crate::common::Address;
+use crate::common::bitmap::Bitmap;
 
 #[derive(Clone)]
 pub struct AddressBitmap {

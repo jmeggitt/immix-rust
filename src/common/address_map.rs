@@ -1,9 +1,9 @@
-extern crate libc;
+use libc;
 
 use std::mem;
-use common::LOG_POINTER_SIZE;
-use common::Address;
-use heap::gc::malloc_zero;
+use crate::common::LOG_POINTER_SIZE;
+use crate::common::Address;
+use crate::heap::gc::malloc_zero;
 
 #[derive(Clone)]
 pub struct AddressMap<T: Copy> {

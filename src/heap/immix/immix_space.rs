@@ -1,11 +1,8 @@
-use heap::immix;
-use heap::gc;
-use common::Address;
-use common::AddressMap;
+use crate::heap::immix;
+use crate::heap::gc;
+use crate::common::Address;
+use crate::common::AddressMap;
 
-extern crate std;
-extern crate memmap;
-extern crate libc;
 
 use std::*;
 use std::collections::LinkedList;
@@ -231,7 +228,7 @@ impl ImmixSpace {
             let mut has_free_lines = false;
             
             {
-                let mut cur_line_mark_table = block.line_mark_table_mut();
+                let cur_line_mark_table = block.line_mark_table_mut();
                 for i in 0..cur_line_mark_table.len() {
                     if cur_line_mark_table.get(i) != immix::LineMark::Live && cur_line_mark_table.get(i) != immix::LineMark::ConservLive {
                         has_free_lines = true;

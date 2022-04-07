@@ -1,22 +1,22 @@
-use heap::immix::MUTATORS;
-use heap::immix::N_MUTATORS;
-use heap::immix::ImmixMutatorLocal;
-use heap::immix::ImmixSpace;
-use heap::immix::ImmixLineMarkTable;
-use heap::freelist::FreeListSpace;
-use objectmodel;
+use crate::heap::immix::MUTATORS;
+use crate::heap::immix::N_MUTATORS;
+use crate::heap::immix::ImmixMutatorLocal;
+use crate::heap::immix::ImmixSpace;
+use crate::heap::immix::ImmixLineMarkTable;
+use crate::heap::freelist::FreeListSpace;
+use crate::objectmodel;
 
-use common;
-use common::{Address, ObjectReference};
-use common::AddressMap;
+use crate::common;
+use crate::common::{Address, ObjectReference};
+use crate::common::AddressMap;
 
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::{Arc, Mutex, Condvar, RwLock};
-
-extern crate crossbeam;
+use lazy_static::lazy_static;
+use log::trace;
 
 #[cfg(feature = "mt-trace")]
-use self::crossbeam::sync::chase_lev::*;
+use crossbeam::sync::chase_lev::*;
 #[cfg(feature = "mt-trace")]
 use std::sync::mpsc;
 #[cfg(feature = "mt-trace")]
@@ -31,14 +31,14 @@ lazy_static! {
         Arc::new((Mutex::new(0), Condvar::new()))
     };
     
-    static ref GET_ROOTS : RwLock<Box<Fn()->Vec<ObjectReference> + Sync + Send>> = RwLock::new(Box::new(get_roots));
+    static ref GET_ROOTS : RwLock<Box<dyn Fn()->Vec<ObjectReference> + Sync + Send>> = RwLock::new(Box::new(get_roots));
     
     static ref GC_CONTEXT : RwLock<GCContext> = RwLock::new(GCContext{immix_space: None, lo_space: None});
     
     static ref ROOTS : RwLock<Vec<ObjectReference>> = RwLock::new(vec![]);
 }
 
-static CONTROLLER : AtomicIsize = atomic::ATOMIC_ISIZE_INIT;
+static CONTROLLER : AtomicIsize = atomic::AtomicIsize::new(0);
 const  NO_CONTROLLER : isize    = -1;
 
 pub struct GCContext {
@@ -57,21 +57,20 @@ pub fn init(immix_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) 
     gccontext.lo_space = Some(lo_space);
 }
 
-pub fn init_get_roots(get_roots: Box<Fn()->Vec<ObjectReference> + Sync + Send>) {
+pub fn init_get_roots(get_roots: Box<dyn Fn()->Vec<ObjectReference> + Sync + Send>) {
     *GET_ROOTS.write().unwrap() = get_roots;
 }
 
 pub fn trigger_gc() {
     trace!("Triggering GC...");
     
-    for mut m in MUTATORS.write().unwrap().iter_mut() {
+    for m in MUTATORS.write().unwrap().iter_mut() {
         if m.is_some() {
             m.as_mut().unwrap().set_take_yield(true);
         }
     }
 }
 
-extern crate libc;
 #[cfg(target_arch = "x86_64")]
 #[link(name = "gc_clib_x64")]
 extern "C" {
@@ -178,7 +177,7 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
         
         // mutators will resume
         CONTROLLER.store(NO_CONTROLLER, Ordering::SeqCst);
-        for mut t in MUTATORS.write().unwrap().iter_mut() {
+        for t in MUTATORS.write().unwrap().iter_mut() {
             if t.is_some() {
                 let t_mut = t.as_mut().unwrap();
                 t_mut.set_take_yield(false);
@@ -213,7 +212,7 @@ fn block_current_thread(mutator: &mut ImmixMutatorLocal) {
     trace!("Mutator{} unblocked", mutator.id());
 }
 
-pub static GC_COUNT : atomic::AtomicUsize = atomic::ATOMIC_USIZE_INIT;
+pub static GC_COUNT : atomic::AtomicUsize = atomic::AtomicUsize::new(0);
 
 fn gc() {
     GC_COUNT.store(GC_COUNT.load(atomic::Ordering::SeqCst) + 1, atomic::Ordering::SeqCst);
@@ -248,7 +247,7 @@ fn gc() {
 pub const MULTI_THREAD_TRACE_THRESHOLD : usize = 10;
 
 pub const PUSH_BACK_THRESHOLD : usize = 50;
-pub static GC_THREADS : atomic::AtomicUsize = atomic::ATOMIC_USIZE_INIT;
+pub static GC_THREADS : atomic::AtomicUsize = atomic::AtomicUsize::new(0);
 
 #[allow(unused_variables)]
 #[inline(never)]
@@ -298,7 +297,6 @@ pub fn start_trace(work_stack: &mut Vec<ObjectReference>, immix_space: Arc<Immix
 #[inline(never)]
 #[cfg(not(feature = "mt-trace"))]
 pub fn start_trace(local_queue: &mut Vec<ObjectReference>, immix_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
-    use objectmodel;
     let mark_state = objectmodel::MARK_STATE.load(Ordering::SeqCst) as u8;
     
     while !local_queue.is_empty() {
@@ -309,8 +307,7 @@ pub fn start_trace(local_queue: &mut Vec<ObjectReference>, immix_space: Arc<Immi
 #[allow(unused_variables)]
 #[cfg(feature = "mt-trace")]
 fn start_steal_trace(stealer: Stealer<ObjectReference>, job_sender:mpsc::Sender<ObjectReference>, immix_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
-    use objectmodel;
-    
+
     let mut local_queue = vec![];
     
     let line_mark_table = &immix_space.line_mark_table;
@@ -339,8 +336,7 @@ fn start_steal_trace(stealer: Stealer<ObjectReference>, job_sender:mpsc::Sender<
 #[inline(always)]
 #[cfg(feature = "mt-trace")]
 pub fn steal_trace_object(obj: ObjectReference, local_queue: &mut Vec<ObjectReference>, job_sender: &mpsc::Sender<ObjectReference>, alloc_map: *mut u8, trace_map: *mut u8, line_mark_table: &ImmixLineMarkTable, immix_start: Address, immix_end: Address, mark_state: u8, lo_space: &Arc<RwLock<FreeListSpace>>) {
-    use objectmodel;
-    
+
     objectmodel::mark_as_traced(trace_map, immix_start, obj, mark_state);
     
     let addr = obj.to_address();
@@ -386,8 +382,7 @@ pub fn steal_trace_object(obj: ObjectReference, local_queue: &mut Vec<ObjectRefe
 #[inline(always)]
 #[cfg(feature = "mt-trace")]
 pub fn steal_process_edge(addr: Address, local_queue:&mut Vec<ObjectReference>, trace_map: *mut u8, immix_start: Address, job_sender: &mpsc::Sender<ObjectReference>, mark_state: u8) {
-    use objectmodel;
-    
+
     let obj_addr = unsafe{addr.load::<ObjectReference>()};
 
     if !obj_addr.to_address().is_zero() && !objectmodel::is_traced(trace_map, immix_start, obj_addr, mark_state) {
@@ -401,8 +396,7 @@ pub fn steal_process_edge(addr: Address, local_queue:&mut Vec<ObjectReference>, 
 
 #[inline(always)]
 pub fn trace_object(obj: ObjectReference, local_queue: &mut Vec<ObjectReference>, alloc_map: *mut u8, trace_map: *mut u8, line_mark_table: &ImmixLineMarkTable, immix_start: Address, immix_end: Address, mark_state: u8) {
-    use objectmodel;
-    
+
     objectmodel::mark_as_traced(trace_map, immix_start, obj, mark_state);
 
     let addr = obj.to_address();
@@ -448,8 +442,7 @@ pub fn trace_object(obj: ObjectReference, local_queue: &mut Vec<ObjectReference>
 
 #[inline(always)]
 pub fn process_edge(addr: Address, local_queue:&mut Vec<ObjectReference>, trace_map: *mut u8, space_start: Address, mark_state: u8) {
-    use objectmodel;
-    
+
     let obj_addr : ObjectReference = unsafe{addr.load()};
 
     if !obj_addr.to_address().is_zero() && !objectmodel::is_traced(trace_map, space_start, obj_addr, mark_state) {
