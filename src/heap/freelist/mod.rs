@@ -1,6 +1,6 @@
-use std::alloc::{GlobalAlloc, Layout, System};
 use crate::common::Address;
 use crate::heap::{gc, immix};
+use std::alloc::{GlobalAlloc, Layout, System};
 
 use std::collections::LinkedList;
 use std::sync::Arc;
@@ -141,15 +141,15 @@ use std::fmt;
 
 impl fmt::Display for FreeListSpace {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "FreeListSpace\n").unwrap();
-        write!(f, "{} used, {} total\n", self.used_bytes, self.size).unwrap();
-        write!(f, "nodes:\n").unwrap();
+        writeln!(f, "FreeListSpace")?;
+        writeln!(f, "{} used, {} total", self.used_bytes, self.size)?;
+        writeln!(f, "nodes:")?;
 
         for node in self.current_nodes() {
-            write!(f, "  {}\n", node).unwrap();
+            writeln!(f, "  {}", node)?;
         }
 
-        write!(f, "done\n")
+        writeln!(f, "done")
     }
 }
 

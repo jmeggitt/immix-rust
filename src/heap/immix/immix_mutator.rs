@@ -299,10 +299,10 @@ impl fmt::Display for ImmixMutatorLocal {
         if self.cursor.is_zero() {
             write!(f, "Mutator (not initialized)")
         } else {
-            write!(f, "Mutator:\n").unwrap();
-            write!(f, "cursor= {:#X}\n", self.cursor).unwrap();
-            write!(f, "limit = {:#X}\n", self.limit).unwrap();
-            write!(f, "line  = {}\n", self.line).unwrap();
+            writeln!(f, "Mutator:")?;
+            writeln!(f, "cursor= {:#X}", self.cursor)?;
+            writeln!(f, "limit = {:#X}", self.limit)?;
+            writeln!(f, "line  = {}", self.line)?;
             write!(f, "block = {}", self.block.as_ref().unwrap())
         }
     }

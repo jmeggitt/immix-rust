@@ -365,8 +365,8 @@ unsafe impl Send for ImmixSpace {}
 
 impl fmt::Display for ImmixSpace {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ImmixSpace\n").unwrap();
-        write!(f, "range={:#X} ~ {:#X}\n", self.start, self.end).unwrap();
+        writeln!(f, "ImmixSpace")?;
+        writeln!(f, "range={:#X} ~ {:#X}", self.start, self.end)?;
 
         // print table by vec
         //        write!(f, "table={{\n").unwrap();
@@ -379,7 +379,7 @@ impl fmt::Display for ImmixSpace {
         //        }
         //        write!(f, "\n}}\n").unwrap();
 
-        write!(f, "t_ptr={:?}\n", self.line_mark_table.ptr).unwrap();
+        writeln!(f, "t_ptr={:?}", self.line_mark_table.ptr)?;
         //        write!(f, "usable blocks:\n").unwrap();
         //        for b in self.usable_blocks.iter() {
         //            write!(f, "  {}\n", b).unwrap();
@@ -388,7 +388,7 @@ impl fmt::Display for ImmixSpace {
         //        for b in self.used_blocks.iter() {
         //            write!(f, "  {}\n", b).unwrap();
         //        }
-        write!(f, "done\n")
+        writeln!(f, "done")
     }
 }
 
@@ -398,12 +398,11 @@ impl fmt::Display for ImmixBlock {
             f,
             "ImmixBlock#{}(state={:?}, address={:#X}, line_table={:?}",
             self.id, self.state, self.start, self.line_mark_table.ptr
-        )
-        .unwrap();
+        )?;
 
-        write!(f, "[").unwrap();
+        write!(f, "[")?;
         for i in 0..immix::LINES_IN_BLOCK {
-            write!(f, "{:?},", self.line_mark_table.get(i)).unwrap();
+            write!(f, "{:?},", self.line_mark_table.get(i))?;
         }
         write!(f, "]")
     }
