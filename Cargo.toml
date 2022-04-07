@@ -1,12 +1,8 @@
 [package]
-
 name = "immix_rust"
 version = "0.0.1"
 authors = [ "Yi Lin <yi.lin@anu.edu.au>" ]
 edition = "2018"
-
-[target."cfg(unix)".build-dependencies.gcc]
-version = "*"
 
 [lib]
 name = "immix_rust"
@@ -14,7 +10,6 @@ path = "src/lib.rs"
 crate-type = ["dylib"]
 
 [[bin]]
-
 name = "immix-rust"
 path = "src/main.rs"
 
@@ -25,7 +20,6 @@ mt-gcbench = ["mt-trace"]
 gcbench = ["mt-trace"]
 mark = []
 trace = []
-
 mt-trace = []
 
 [dependencies]
@@ -37,3 +31,6 @@ log = "0.4"
 aligned_alloc = "0.1.2"
 crossbeam = "0.2.8"
 simple_logger = "2.1"
+
+[target."cfg(unix)".build-dependencies.gcc]
+version = "*"
