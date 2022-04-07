@@ -5,10 +5,7 @@ use std::mem;
 //#[cfg(target_os = "linux")]
 //pub mod perf;
 
-mod address_bitmap;
 mod address_map;
-mod bitmap;
-pub use self::address_bitmap::AddressBitmap;
 pub use self::address_map::AddressMap;
 
 pub const LOG_POINTER_SIZE: usize = 3;
