@@ -14,8 +14,6 @@ use crate::heap::immix::ImmixMutatorLocal;
 use crate::heap::immix::ImmixSpace;
 use std::mem::size_of;
 
-use time;
-
 const kStretchTreeDepth: i32 = 18;
 const kLongLivedTreeDepth: i32 = 16;
 const kArraySize: i32 = 500000;
@@ -82,28 +80,22 @@ fn TimeConstruction(depth: i32, mutator: &mut ImmixMutatorLocal) {
     let iNumIters = NumIters(depth);
     println!("creating {} trees of depth {}", iNumIters, depth);
 
-    let tStart = time::now_utc();
+    let time_start = Instant::now();
     for _ in 0..iNumIters {
         let tempTree = alloc(mutator);
         Populate(depth, tempTree, mutator);
 
         // destroy tempTree
     }
-    let tFinish = time::now_utc();
-    println!(
-        "\tTop down construction took {} msec",
-        (tFinish - tStart).num_milliseconds()
-    );
+    let elapsed = time_start.elapsed();
+    println!("\tTop down construction took {:?}", elapsed);
 
-    let tStart = time::now_utc();
+    let time_start = Instant::now();
     for _ in 0..iNumIters {
         let tempTree = MakeTree(depth, mutator);
     }
-    let tFinish = time::now_utc();
-    println!(
-        "\tButtom up construction took {} msec",
-        (tFinish - tStart).num_milliseconds()
-    );
+    let elapsed = time_start.elapsed();
+    println!("\tButtom up construction took {:?}", elapsed);
 }
 
 fn run_one_test(immix_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
@@ -129,6 +121,7 @@ fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
 }
 
 use std::env;
+use std::time::Instant;
 
 pub fn start() {
     unsafe {
@@ -169,7 +162,7 @@ pub fn start() {
     );
     PrintDiagnostics();
 
-    let tStart = time::now_utc();
+    let time_start = Instant::now();
 
     // Stretch the memory space quickly
     let tempTree = MakeTree(kStretchTreeDepth, &mut mutator);
@@ -212,11 +205,10 @@ pub fn start() {
         println!("Failed(long lived tree wrong)");
     }
 
-    let tFinish = time::now_utc();
-    let tElapsed = (tFinish - tStart).num_milliseconds();
+    let elapsed = time_start.elapsed();
 
     PrintDiagnostics();
-    println!("Completed in {} msec", tElapsed);
+    println!("Completed in {:?}", elapsed);
     println!(
         "Finished with {} collections",
         heap::gc::GC_COUNT.load(Ordering::SeqCst)

@@ -1,5 +1,3 @@
-use time;
-
 use crate::common::Address;
 use crate::heap;
 use crate::heap::freelist::FreeListSpace;
@@ -9,6 +7,7 @@ use crate::heap::immix::ImmixSpace;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::time::Instant;
 
 use crate::exhaust::ALLOCATION_TIMES;
 use crate::exhaust::OBJECT_ALIGN;
@@ -59,14 +58,14 @@ pub fn alloc_init() {
 #[inline(never)]
 fn init_loop(objs: Vec<Address>, mutator: &mut ImmixMutatorLocal) {
     println!("Start init objects");
-    let t_start = time::now_utc();
+    let time_start = Instant::now();
 
     for obj in objs {
         mutator.init_object_no_inline(obj, 0b1100_0011);
         //        mutator.init_object_no_inline(obj, 0b1100_0111);
     }
 
-    let t_end = time::now_utc();
+    let elapsed = time_start.elapsed();
 
-    println!("time used: {} msec", (t_end - t_start).num_milliseconds());
+    println!("time used: {:?}", elapsed);
 }

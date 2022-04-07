@@ -1,5 +1,3 @@
-use time;
-
 use crate::common::ObjectReference;
 use crate::heap;
 use crate::heap::freelist::FreeListSpace;
@@ -9,6 +7,7 @@ use crate::heap::immix::ImmixSpace;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::time::Instant;
 
 use crate::exhaust::ALLOCATION_TIMES;
 use crate::exhaust::OBJECT_ALIGN;
@@ -60,7 +59,7 @@ pub fn alloc_mark() {
 #[inline(never)]
 fn mark_loop(objs: Vec<ObjectReference>, shared_space: &Arc<ImmixSpace>) {
     println!("Start marking");
-    let t_start = time::now_utc();
+    let time_start = Instant::now();
 
     let mark_state = crate::objectmodel::MARK_STATE.load(Ordering::SeqCst) as u8;
 
@@ -81,7 +80,7 @@ fn mark_loop(objs: Vec<ObjectReference>, shared_space: &Arc<ImmixSpace>) {
         }
     }
 
-    let t_end = time::now_utc();
+    let elapsed = time_start.elapsed();
 
-    println!("time used: {} msec", (t_end - t_start).num_milliseconds());
+    println!("time used: {:?}", elapsed);
 }

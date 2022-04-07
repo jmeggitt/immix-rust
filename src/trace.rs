@@ -1,5 +1,3 @@
-use time;
-
 use crate::common::Address;
 use crate::heap;
 use crate::heap::freelist::FreeListSpace;
@@ -9,6 +7,7 @@ use crate::heap::immix::ImmixSpace;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::time::Instant;
 
 use crate::exhaust::ALLOCATION_TIMES;
 use crate::exhaust::OBJECT_ALIGN;
@@ -76,11 +75,11 @@ fn trace_loop(root: Address, shared_space: Arc<ImmixSpace>, lo_space: Arc<RwLock
     println!("Start tracing");
     let mut roots = vec![unsafe { root.to_object_reference() }];
 
-    let t_start = time::now_utc();
+    let time_start = Instant::now();
 
     heap::gc::start_trace(&mut roots, shared_space, lo_space);
 
-    let t_end = time::now_utc();
+    let elapsed = time_start.elapsed();
 
-    println!("time used: {} msec", (t_end - t_start).num_milliseconds());
+    println!("time used: {:?}", elapsed);
 }

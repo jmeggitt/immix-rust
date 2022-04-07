@@ -4,6 +4,7 @@ use crate::heap::immix::ImmixMutatorLocal;
 use crate::heap::immix::ImmixSpace;
 
 use std::sync::RwLock;
+use std::time::Instant;
 
 pub const OBJECT_SIZE: usize = 24;
 pub const OBJECT_ALIGN: usize = 8;
@@ -48,7 +49,7 @@ pub fn exhaust_alloc() {
 
 #[inline(never)]
 fn alloc_loop(mutator: &mut ImmixMutatorLocal) {
-    let t_start = time::now_utc();
+    let time_start = Instant::now();
 
     for _ in 0..ALLOCATION_TIMES {
         //        mutator.yieldpoint();
@@ -57,7 +58,6 @@ fn alloc_loop(mutator: &mut ImmixMutatorLocal) {
         mutator.init_object(res, 0b1100_0011);
     }
 
-    let t_end = time::now_utc();
-
-    println!("time used: {} msec", (t_end - t_start).num_milliseconds());
+    let elapsed = time_start.elapsed();
+    println!("time used: {:?}", elapsed);
 }
