@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::env;
 use std::sync::atomic::Ordering;
 
