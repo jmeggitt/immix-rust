@@ -1,7 +1,6 @@
+use std::alloc::{GlobalAlloc, Layout, System};
 use crate::common::Address;
 use crate::heap::{gc, immix};
-
-use aligned_alloc;
 
 use std::collections::LinkedList;
 use std::sync::Arc;
@@ -32,14 +31,16 @@ impl FreeListSpace {
         if self.used_bytes + size > self.size {
             None
         } else {
-            let ret = self::aligned_alloc::aligned_alloc(size, align);
+            // TODO: Add nightly feature to use allocator_api instead
+            let layout = Layout::from_size_align(size, align).ok()?;
+            let ret = unsafe { System.alloc(layout) };
 
-            let addr = Address::from_ptr::<()>(ret);
+            let addr = Address::from_ptr(ret);
 
             self.current_nodes.push_front(Box::new(FreeListNode {
                 id: self.node_id,
                 start: addr,
-                size: size,
+                layout,
                 mark: NodeMark::FreshAlloc,
             }));
             self.node_id += 1;
@@ -60,14 +61,13 @@ impl FreeListSpace {
                 match node.mark {
                     NodeMark::Live => {
                         node.set_mark(NodeMark::PrevLive);
-                        used_bytes += node.size;
+                        used_bytes += node.layout.size();
                         ret.push_back(node);
                     }
                     NodeMark::PrevLive | NodeMark::FreshAlloc => {
-                        let ptr = node.start.to_ptr::<()>() as *mut ();
                         // free the memory
                         unsafe {
-                            self::aligned_alloc::aligned_free(ptr);
+                            System.dealloc(node.start.to_ptr_mut(), node.layout);
                         }
                         // do not add this node into new linked list
                     }
@@ -92,7 +92,8 @@ impl FreeListSpace {
 pub struct FreeListNode {
     id: usize,
     start: Address,
-    size: usize,
+    // size: usize,
+    layout: Layout,
     mark: NodeMark,
 }
 
@@ -156,8 +157,8 @@ impl fmt::Display for FreeListNode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "FreeListNode#{}(start={:#X}, size={}, state={:?})",
-            self.id, self.start, self.size, self.mark
+            "FreeListNode#{}(start={:#X}, layout={:?}, state={:?})",
+            self.id, self.start, self.layout, self.mark
         )
     }
 }
