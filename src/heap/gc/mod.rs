@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 
 #[cfg(feature = "mt-trace")]
-use crossbeam::sync::chase_lev::*;
+use crossbeam::deque::{Steal, Stealer, Worker};
 #[cfg(feature = "mt-trace")]
 use std::sync::mpsc;
 #[cfg(feature = "mt-trace")]
@@ -27,8 +27,7 @@ use std::thread;
 use std::sync::atomic;
 
 lazy_static! {
-    static ref STW_COND: Arc<(Mutex<usize>, Condvar)> =
-        { Arc::new((Mutex::new(0), Condvar::new())) };
+    static ref STW_COND: Arc<(Mutex<usize>, Condvar)> = Arc::new((Mutex::new(0), Condvar::new()));
     static ref GET_ROOTS: RwLock<Box<dyn Fn() -> Vec<ObjectReference> + Sync + Send>> =
         RwLock::new(Box::new(get_roots));
     static ref GC_CONTEXT: RwLock<GCContext> = RwLock::new(GCContext {
@@ -290,7 +289,8 @@ pub fn start_trace(
     lo_space: Arc<RwLock<FreeListSpace>>,
 ) {
     // creates root deque
-    let (mut worker, stealer) = deque();
+    let mut worker = Worker::new_lifo();
+    let stealer = worker.stealer();
 
     while !work_stack.is_empty() {
         worker.push(work_stack.pop().unwrap());
@@ -322,7 +322,7 @@ pub fn start_trace(
             }
         }
 
-        match worker.try_pop() {
+        match worker.pop() {
             Some(obj_ref) => worker.push(obj_ref),
             None => break,
         }
@@ -376,8 +376,8 @@ fn start_steal_trace(
                 let work = stealer.steal();
                 match work {
                     Steal::Empty => return,
-                    Steal::Abort => continue,
-                    Steal::Data(obj) => obj,
+                    Steal::Retry => continue,
+                    Steal::Success(obj) => obj,
                 }
             }
         };
