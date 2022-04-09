@@ -18,6 +18,7 @@ impl<T> AddressMap<T> {
 
         // TODO: This should be a regular Vec
         let layout = Layout::array::<T>(len).unwrap();
+
         let ptr = unsafe { System.alloc_zeroed(layout) as *mut T };
 
         AddressMap {
@@ -38,6 +39,8 @@ impl<T> AddressMap<T> {
 impl<T: Copy> AddressMap<T> {
     #[inline(always)]
     pub fn get(&self, addr: Address) -> T {
+        debug_assert!(addr < self.end);
+
         let index = (addr.diff(self.start) >> LOG_POINTER_SIZE) as isize;
         unsafe { *self.ptr.offset(index) }
     }

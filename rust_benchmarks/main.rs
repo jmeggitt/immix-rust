@@ -2,10 +2,6 @@ use immix_rust::{heap, objectmodel};
 use std::env;
 use std::sync::atomic::Ordering;
 
-// mod common;
-// mod heap;
-// mod objectmodel;
-
 mod exhaust;
 mod gcbench;
 mod mark;
@@ -23,7 +19,7 @@ fn main() {
 
     match env::var("HEAP_SIZE") {
         Ok(val) => {
-            if val.ends_with("M") {
+            if val.ends_with('M') {
                 let (num, _) = val.split_at(val.len() - 1);
                 let heap_size = num.parse::<usize>().unwrap() << 20;
 

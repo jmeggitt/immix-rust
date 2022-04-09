@@ -26,9 +26,9 @@ pub fn alloc_init() {
         let space: FreeListSpace = FreeListSpace::new(heap::LO_SPACE_SIZE.load(Ordering::SeqCst));
         Arc::new(RwLock::new(space))
     };
-    heap::gc::init(shared_space.clone(), lo_space.clone());
+    heap::gc::init(shared_space.clone(), lo_space);
 
-    let mut mutator = ImmixMutatorLocal::new(shared_space.clone());
+    let mut mutator = ImmixMutatorLocal::new(shared_space);
 
     println!(
         "Trying to allocate 1 object of (size {}, align {}). ",

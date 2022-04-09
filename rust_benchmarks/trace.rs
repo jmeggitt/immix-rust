@@ -26,7 +26,7 @@ pub fn alloc_trace() {
         let space: FreeListSpace = FreeListSpace::new(heap::LO_SPACE_SIZE.load(Ordering::SeqCst));
         Arc::new(RwLock::new(space))
     };
-    heap::gc::init(shared_space.clone(), lo_space.clone());
+    heap::gc::init(shared_space.clone(), lo_space);
 
     let mut mutator = ImmixMutatorLocal::new(shared_space.clone());
 
@@ -59,17 +59,17 @@ pub fn alloc_trace() {
         prev = res;
     }
 
-    trace_loop(root, shared_space, lo_space);
+    trace_loop(root, shared_space);
 }
 
 #[inline(never)]
-fn trace_loop(root: Address, shared_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
+fn trace_loop(root: Address, shared_space: Arc<ImmixSpace>) {
     println!("Start tracing");
     let mut roots = vec![unsafe { root.to_object_reference() }];
 
     let time_start = Instant::now();
 
-    heap::gc::start_trace(&mut roots, shared_space, lo_space);
+    heap::gc::start_trace(&mut roots, shared_space);
 
     let elapsed = time_start.elapsed();
 

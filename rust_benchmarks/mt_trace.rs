@@ -20,7 +20,7 @@ fn alloc_k_ary_tree(mutator: &mut ImmixMutatorLocal) -> Address {
 }
 
 fn make_tree(depth: usize, mutator: &mut ImmixMutatorLocal) -> Address {
-    if depth <= 0 {
+    if depth == 0 {
         alloc_k_ary_tree(mutator)
     } else {
         let mut children = vec![];
@@ -58,7 +58,7 @@ pub fn alloc_trace() {
         let space: FreeListSpace = FreeListSpace::new(heap::LO_SPACE_SIZE.load(Ordering::SeqCst));
         Arc::new(RwLock::new(space))
     };
-    heap::gc::init(shared_space.clone(), lo_space.clone());
+    heap::gc::init(shared_space.clone(), lo_space);
     let mut mutator = ImmixMutatorLocal::new(shared_space.clone());
 
     println!(
@@ -88,7 +88,7 @@ pub fn alloc_trace() {
     println!("Start tracing");
 
     let time_start = Instant::now();
-    heap::gc::start_trace(&mut roots, shared_space, lo_space);
+    heap::gc::start_trace(&mut roots, shared_space);
     let elapsed = time_start.elapsed();
 
     println!("time used: {:?}", elapsed);

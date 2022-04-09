@@ -1,4 +1,3 @@
-use std::cmp;
 use std::fmt;
 use std::mem;
 
@@ -9,7 +8,7 @@ pub const LOG_POINTER_SIZE: usize = 3;
 pub const POINTER_SIZE: usize = 1 << LOG_POINTER_SIZE;
 
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Address(usize);
 
 impl Address {
@@ -71,7 +70,7 @@ impl Address {
     }
     #[inline(always)]
     pub fn from_ptr<T>(ptr: *const T) -> Address {
-        unsafe { mem::transmute(ptr) }
+        Address(ptr as usize)
     }
     #[inline(always)]
     pub fn to_ptr<T>(&self) -> *const T {
@@ -88,24 +87,6 @@ impl Address {
     #[inline(always)]
     pub unsafe fn zero() -> Address {
         Address(0)
-    }
-}
-
-impl PartialOrd for Address {
-    #[inline(always)]
-    fn partial_cmp(&self, other: &Address) -> Option<cmp::Ordering> {
-        Some(self.0.cmp(&other.0))
-    }
-}
-
-impl PartialEq for Address {
-    #[inline(always)]
-    fn eq(&self, other: &Address) -> bool {
-        self.0 == other.0
-    }
-    #[inline(always)]
-    fn ne(&self, other: &Address) -> bool {
-        self.0 != other.0
     }
 }
 
@@ -128,38 +109,21 @@ impl fmt::Debug for Address {
 }
 
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ObjectReference(usize);
 
 impl ObjectReference {
     #[inline(always)]
     pub fn to_address(&self) -> Address {
-        unsafe { mem::transmute(self.0) }
+        Address(self.0)
     }
+
     #[inline(always)]
     pub fn is_null(&self) -> bool {
         self.0 != 0
     }
     pub fn value(&self) -> usize {
         self.0
-    }
-}
-
-impl PartialOrd for ObjectReference {
-    #[inline(always)]
-    fn partial_cmp(&self, other: &ObjectReference) -> Option<cmp::Ordering> {
-        Some(self.0.cmp(&other.0))
-    }
-}
-
-impl PartialEq for ObjectReference {
-    #[inline(always)]
-    fn eq(&self, other: &ObjectReference) -> bool {
-        self.0 == other.0
-    }
-    #[inline(always)]
-    fn ne(&self, other: &ObjectReference) -> bool {
-        self.0 != other.0
     }
 }
 

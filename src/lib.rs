@@ -1,3 +1,6 @@
+// TODO: Reduce the number of unsafe functions then remove this
+#![allow(clippy::missing_safety_doc)]
+
 use lazy_static::lazy_static;
 use std::sync::atomic::Ordering;
 
@@ -46,8 +49,8 @@ pub extern "C" fn gc_init(immix_size: usize, lo_size: usize, n_gcthreads: usize)
     };
 
     *MY_GC.write() = Some(GC {
-        immix_space: immix_space,
-        lo_space: lo_space,
+        immix_space,
+        lo_space,
     });
     println!(
         "heap is {} bytes (immix: {} bytes, lo: {} bytes) . ",
@@ -72,9 +75,9 @@ pub extern "C" fn new_mutator() -> Box<ImmixMutatorLocal> {
 }
 
 #[no_mangle]
-#[allow(unused_variables)]
 pub extern "C" fn drop_mutator(mutator: Box<ImmixMutatorLocal>) {
-    // rust will reclaim the boxed mutator
+    // Not required, but explicitly drop mutator to make intentions more explicit
+    drop(mutator)
 }
 
 #[no_mangle]

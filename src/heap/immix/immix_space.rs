@@ -47,7 +47,7 @@ impl LineMarkTable {
         };
 
         LineMarkTable {
-            space_start: space_start,
+            space_start,
             ptr: line_mark_table,
             len: line_mark_table_len,
         }
@@ -55,8 +55,8 @@ impl LineMarkTable {
 
     pub fn take_slice(&mut self, start: usize, len: usize) -> LineMarkTableSlice {
         LineMarkTableSlice {
-            ptr: unsafe { self.ptr.offset(start as isize) },
-            len: len,
+            ptr: unsafe { self.ptr.add(start) },
+            len,
         }
     }
 
@@ -64,13 +64,13 @@ impl LineMarkTable {
     #[allow(dead_code)]
     fn get(&self, index: usize) -> immix::LineMark {
         debug_assert!(index <= self.len);
-        unsafe { *self.ptr.offset(index as isize) }
+        unsafe { *self.ptr.add(index) }
     }
 
     #[inline(always)]
     fn set(&self, index: usize, value: immix::LineMark) {
         debug_assert!(index <= self.len);
-        unsafe { *self.ptr.offset(index as isize) = value };
+        unsafe { *self.ptr.add(index) = value };
     }
 
     #[inline(always)]
@@ -100,12 +100,12 @@ impl LineMarkTableSlice {
     #[inline(always)]
     pub fn get(&self, index: usize) -> immix::LineMark {
         debug_assert!(index <= self.len);
-        unsafe { *self.ptr.offset(index as isize) }
+        unsafe { *self.ptr.add(index) }
     }
     #[inline(always)]
     pub fn set(&mut self, index: usize, value: immix::LineMark) {
         debug_assert!(index <= self.len);
-        unsafe { *self.ptr.offset(index as isize) = value };
+        unsafe { *self.ptr.add(index) = value };
     }
     #[inline(always)]
     pub fn len(&self) -> usize {
@@ -163,11 +163,11 @@ impl ImmixSpace {
         let line_mark_table = LineMarkTable::new(start, end);
 
         let mut ret = ImmixSpace {
-            start: start,
-            end: end,
+            start,
+            end,
             mmap: anon_mmap,
 
-            line_mark_table: line_mark_table,
+            line_mark_table,
             trace_map: Arc::new(AddressMap::new(start, end)),
             alloc_map: Arc::new(AddressMap::new(start, end)),
             usable_blocks: Mutex::new(LinkedList::new()),
@@ -180,7 +180,7 @@ impl ImmixSpace {
         ret
     }
 
-    fn init_blocks(&mut self) -> () {
+    fn init_blocks(&mut self) {
         let mut id = 0;
         let mut block_start = self.start;
         let mut line = 0;
@@ -189,7 +189,7 @@ impl ImmixSpace {
 
         while block_start.plus(immix::BYTES_IN_BLOCK) <= self.end {
             usable_blocks_lock.push_back(Box::new(ImmixBlock {
-                id: id,
+                id,
                 state: immix::BlockMark::Usable,
                 start: block_start,
                 line_mark_table: self.line_mark_table.take_slice(line, immix::LINES_IN_BLOCK),
@@ -211,7 +211,6 @@ impl ImmixSpace {
         self.used_blocks.lock().push_front(old);
     }
 
-    #[allow(unreachable_code)]
     pub fn get_next_usable_block(&self) -> Option<Box<ImmixBlock>> {
         let res_new_block: Option<Box<ImmixBlock>> = { self.usable_blocks.lock().pop_front() };
         if res_new_block.is_none() {
@@ -224,7 +223,6 @@ impl ImmixSpace {
         }
     }
 
-    #[allow(unused_variables)]
     pub fn sweep(&self) {
         let mut free_lines = 0;
         let mut usable_blocks = 0;

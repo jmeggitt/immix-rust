@@ -20,7 +20,7 @@ lazy_static! {
 }
 
 #[inline(always)]
-pub fn fill_alignment_gap(start: Address, end: Address) -> () {
+pub fn fill_alignment_gap(start: Address, end: Address) {
     debug_assert!(end >= start);
     start.memset(ALIGNMENT_VALUE, end.diff(start));
 }
