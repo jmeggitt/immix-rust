@@ -20,13 +20,16 @@ mt-gcbench = ["mt-trace"]
 gcbench = ["mt-trace"]
 mark = []
 trace = []
-mt-trace = []
+mt-trace = ["crossbeam"]
 
 [dependencies]
 memmap = "0.2.2"
 libc = "0.2.121"
 lazy_static = "1.4.0"
 log = "0.4.16"
-crossbeam = "0.8.1"
 simple_logger = "2.1.0"
 parking_lot = "0.12.0"
+
+[dependencies.crossbeam]
+version = "0.8.1"
+optional = true

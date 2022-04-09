@@ -31,7 +31,11 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub extern "C" fn gc_init(immix_size: usize, lo_size: usize, n_gcthreads: usize) {
+pub extern "C" fn gc_init(
+    immix_size: usize,
+    lo_size: usize,
+    #[cfg(feature = "mt-trace")] n_gcthreads: usize,
+) {
     // set this line to turn on certain level of debugging info
     //    simple_logger::init_with_level(log::LogLevel::Trace).ok();
 
@@ -60,8 +64,11 @@ pub extern "C" fn gc_init(immix_size: usize, lo_size: usize, n_gcthreads: usize)
     );
 
     // gc threads
-    heap::gc::GC_THREADS.store(n_gcthreads, Ordering::SeqCst);
-    println!("{} gc threads", n_gcthreads);
+    #[cfg(feature = "mt-trace")]
+    {
+        heap::gc::GC_THREADS.store(n_gcthreads, Ordering::SeqCst);
+        println!("{} gc threads", n_gcthreads);
+    }
 
     // init object model
     objectmodel::init();

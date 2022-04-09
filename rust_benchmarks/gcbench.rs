@@ -166,8 +166,5 @@ pub fn start() {
 
     PrintDiagnostics();
     println!("Completed in {:?}", elapsed);
-    println!(
-        "Finished with {} collections",
-        heap::gc::GC_COUNT.load(Ordering::SeqCst)
-    );
+    println!("Finished with {} collections", heap::gc::gc_count());
 }
