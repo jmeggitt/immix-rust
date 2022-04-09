@@ -9,8 +9,6 @@ pub mod heap;
 pub mod objectmodel;
 
 use common::ObjectReference;
-use heap::freelist;
-use heap::freelist::FreeListSpace;
 use heap::immix::ImmixMutatorLocal;
 use heap::immix::ImmixSpace;
 use parking_lot::RwLock;
@@ -23,7 +21,6 @@ pub use heap::immix::ImmixMutatorLocal as Mutator;
 #[repr(C)]
 pub struct GC {
     immix_space: Arc<ImmixSpace>,
-    lo_space: Arc<RwLock<FreeListSpace>>,
 }
 
 lazy_static! {
@@ -41,20 +38,14 @@ pub extern "C" fn gc_init(
 
     // init space size
     heap::IMMIX_SPACE_SIZE.store(immix_size, Ordering::SeqCst);
-    heap::LO_SPACE_SIZE.store(lo_size, Ordering::SeqCst);
 
-    let (immix_space, lo_space) = {
-        let immix_space = Arc::new(ImmixSpace::new(immix_size));
-        let lo_space = Arc::new(RwLock::new(FreeListSpace::new(lo_size)));
+    let immix_space = Arc::new(ImmixSpace::new(immix_size));
 
-        heap::gc::init(immix_space.clone(), lo_space.clone());
+    heap::gc::init(immix_space.clone());
 
-        (immix_space, lo_space)
-    };
 
     *MY_GC.write() = Some(GC {
         immix_space,
-        lo_space,
     });
     println!(
         "heap is {} bytes (immix: {} bytes, lo: {} bytes) . ",
@@ -117,19 +108,5 @@ pub extern "C" fn alloc_slow(
     align: usize,
 ) -> ObjectReference {
     let ret = mutator.try_alloc_from_local(size, align);
-    unsafe { ret.to_object_reference() }
-}
-
-#[no_mangle]
-pub extern "C" fn alloc_large(
-    mutator: &mut Box<ImmixMutatorLocal>,
-    size: usize,
-) -> ObjectReference {
-    let ret = freelist::alloc_large(
-        size,
-        8,
-        mutator,
-        MY_GC.read().as_ref().unwrap().lo_space.clone(),
-    );
     unsafe { ret.to_object_reference() }
 }

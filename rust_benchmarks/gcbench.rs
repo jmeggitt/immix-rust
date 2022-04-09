@@ -3,8 +3,6 @@
 #![allow(non_snake_case)]
 
 use immix_rust::heap;
-use immix_rust::heap::freelist;
-use immix_rust::heap::freelist::FreeListSpace;
 use immix_rust::heap::immix::ImmixMutatorLocal;
 use immix_rust::heap::immix::ImmixSpace;
 use std::mem::size_of;
@@ -100,7 +98,6 @@ fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
 }
 
 pub fn start() {
-    use parking_lot::RwLock;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
 
@@ -110,11 +107,7 @@ pub fn start() {
         let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
         Arc::new(space)
     };
-    let lo_space: Arc<RwLock<FreeListSpace>> = {
-        let space: FreeListSpace = FreeListSpace::new(heap::LO_SPACE_SIZE.load(Ordering::SeqCst));
-        Arc::new(RwLock::new(space))
-    };
-    heap::gc::init(immix_space.clone(), lo_space.clone());
+    heap::gc::init(immix_space.clone());
     let mut mutator = ImmixMutatorLocal::new(immix_space);
 
     println!("Garbage Collector Test");
@@ -144,7 +137,7 @@ pub fn start() {
     Populate(kLongLivedTreeDepth, longLivedTree, &mut mutator);
 
     println!(" Creating a long-lived array of {} doubles", kArraySize);
-    freelist::alloc_large(size_of::<Array>(), 8, &mut mutator, lo_space);
+    mutator.alloc(size_of::<Array>(), 8);
 
     PrintDiagnostics();
 

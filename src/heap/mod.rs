@@ -2,7 +2,6 @@ use crate::common::Address;
 use lazy_static::lazy_static;
 use std::sync::atomic::AtomicUsize;
 
-pub mod freelist;
 pub mod gc;
 pub mod immix;
 

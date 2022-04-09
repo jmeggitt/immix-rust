@@ -1,6 +1,5 @@
 use immix_rust::common::Address;
 use immix_rust::heap;
-use immix_rust::heap::freelist::FreeListSpace;
 use immix_rust::heap::immix::ImmixMutatorLocal;
 use immix_rust::heap::immix::ImmixSpace;
 use std::time::Instant;
@@ -45,7 +44,6 @@ fn make_tree(depth: usize, mutator: &mut ImmixMutatorLocal) -> Address {
 
 #[allow(unused_variables)]
 pub fn alloc_trace() {
-    use parking_lot::RwLock;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
 
@@ -54,11 +52,7 @@ pub fn alloc_trace() {
 
         Arc::new(space)
     };
-    let lo_space: Arc<RwLock<FreeListSpace>> = {
-        let space: FreeListSpace = FreeListSpace::new(heap::LO_SPACE_SIZE.load(Ordering::SeqCst));
-        Arc::new(RwLock::new(space))
-    };
-    heap::gc::init(shared_space.clone(), lo_space);
+    heap::gc::init(shared_space.clone());
     let mut mutator = ImmixMutatorLocal::new(shared_space.clone());
 
     println!(

@@ -3,14 +3,11 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
 
-use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
 
 use immix_rust::heap;
-use immix_rust::heap::freelist;
-use immix_rust::heap::freelist::FreeListSpace;
 use immix_rust::heap::immix::ImmixMutatorLocal;
 use immix_rust::heap::immix::ImmixSpace;
 use std::mem::size_of;
@@ -100,7 +97,7 @@ fn TimeConstruction(depth: i32, mutator: &mut ImmixMutatorLocal) {
     println!("\tButtom up construction took {:?}", elapsed);
 }
 
-fn run_one_test(immix_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
+fn run_one_test(immix_space: Arc<ImmixSpace>) {
     heap::gc::set_low_water_mark();
     let mut mutator = ImmixMutatorLocal::new(immix_space);
 
@@ -139,11 +136,7 @@ pub fn start() {
         let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
         Arc::new(space)
     };
-    let lo_space: Arc<RwLock<FreeListSpace>> = {
-        let space: FreeListSpace = FreeListSpace::new(heap::LO_SPACE_SIZE.load(Ordering::SeqCst));
-        Arc::new(RwLock::new(space))
-    };
-    heap::gc::init(immix_space.clone(), lo_space.clone());
+    heap::gc::init(immix_space.clone());
 
     let mut mutator = ImmixMutatorLocal::new(immix_space.clone());
 
@@ -174,14 +167,13 @@ pub fn start() {
     Populate(kLongLivedTreeDepth, longLivedTree, &mut mutator);
 
     println!(" Creating a long-lived array of {} doubles", kArraySize);
-    freelist::alloc_large(size_of::<Array>(), 8, &mut mutator, lo_space.clone());
+    mutator.alloc(size_of::<Array>(), 8);
 
     let mut threads = vec![];
     for i in 0..n_threads {
         let immix_space_clone = immix_space.clone();
-        let lo_space_clone = lo_space.clone();
         let t = thread::spawn(move || {
-            run_one_test(immix_space_clone, lo_space_clone);
+            run_one_test(immix_space_clone);
         });
         threads.push(t);
     }

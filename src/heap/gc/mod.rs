@@ -1,4 +1,3 @@
-use crate::heap::freelist::FreeListSpace;
 use crate::heap::immix::ImmixMutatorLocal;
 use crate::heap::immix::ImmixSpace;
 use crate::heap::immix::MUTATORS;
@@ -33,7 +32,6 @@ lazy_static! {
     static ref STW_COND: Arc<(Mutex<usize>, Condvar)> = Arc::new((Mutex::new(0), Condvar::new()));
     static ref GC_CONTEXT: RwLock<GCContext> = RwLock::new(GCContext {
         immix_space: None,
-        lo_space: None
     });
     static ref ROOTS: RwLock<Vec<ObjectReference>> = RwLock::new(vec![]);
 }
@@ -43,14 +41,12 @@ const NO_CONTROLLER: isize = -1;
 
 struct GCContext {
     immix_space: Option<Arc<ImmixSpace>>,
-    lo_space: Option<Arc<RwLock<FreeListSpace>>>,
 }
 
-pub fn init(immix_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
+pub fn init(immix_space: Arc<ImmixSpace>) {
     CONTROLLER.store(NO_CONTROLLER, Ordering::SeqCst);
     let mut gccontext = GC_CONTEXT.write();
     gccontext.immix_space = Some(immix_space);
-    gccontext.lo_space = Some(lo_space);
 }
 
 pub fn trigger_gc() {
