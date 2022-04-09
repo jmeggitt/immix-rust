@@ -2,9 +2,6 @@ use std::cmp;
 use std::fmt;
 use std::mem;
 
-//#[cfg(target_os = "linux")]
-//pub mod perf;
-
 mod address_map;
 pub use self::address_map::AddressMap;
 
