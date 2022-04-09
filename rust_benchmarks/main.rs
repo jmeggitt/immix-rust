@@ -1,9 +1,11 @@
 use std::env;
 use std::sync::atomic::Ordering;
+use immix_rust::{heap, objectmodel};
 
-mod common;
-mod heap;
-mod objectmodel;
+
+// mod common;
+// mod heap;
+// mod objectmodel;
 
 mod exhaust;
 mod gcbench;

@@ -1,8 +1,8 @@
-use crate::common::ObjectReference;
-use crate::heap;
-use crate::heap::freelist::FreeListSpace;
-use crate::heap::immix::ImmixMutatorLocal;
-use crate::heap::immix::ImmixSpace;
+use immix_rust::common::Address;
+use immix_rust::heap;
+use immix_rust::heap::freelist::FreeListSpace;
+use immix_rust::heap::immix::ImmixMutatorLocal;
+use immix_rust::heap::immix::ImmixSpace;
 
 use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
@@ -13,10 +13,10 @@ use crate::exhaust::ALLOCATION_TIMES;
 use crate::exhaust::OBJECT_ALIGN;
 use crate::exhaust::OBJECT_SIZE;
 
-const MARK_TIMES: usize = ALLOCATION_TIMES;
+const INIT_TIMES: usize = ALLOCATION_TIMES;
 
 #[allow(unused_variables)]
-pub fn alloc_mark() {
+pub fn alloc_init() {
     let shared_space: Arc<ImmixSpace> = {
         let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
 
@@ -42,42 +42,27 @@ pub fn alloc_mark() {
 
     println!(
         "Trying to allocate {} objects, which will take roughly {} bytes",
-        MARK_TIMES,
-        MARK_TIMES * ACTUAL_OBJECT_SIZE
+        INIT_TIMES,
+        INIT_TIMES * ACTUAL_OBJECT_SIZE
     );
     let mut objs = vec![];
-    for _ in 0..MARK_TIMES {
+    for _ in 0..INIT_TIMES {
         let res = mutator.alloc(ACTUAL_OBJECT_SIZE, OBJECT_ALIGN);
-        mutator.init_object(res, 0b1100_0011);
 
-        objs.push(unsafe { res.to_object_reference() });
+        objs.push(res);
     }
 
-    mark_loop(objs, &shared_space);
+    init_loop(objs, &mut mutator);
 }
 
 #[inline(never)]
-fn mark_loop(objs: Vec<ObjectReference>, shared_space: &Arc<ImmixSpace>) {
-    println!("Start marking");
+fn init_loop(objs: Vec<Address>, mutator: &mut ImmixMutatorLocal) {
+    println!("Start init objects");
     let time_start = Instant::now();
 
-    let mark_state = crate::objectmodel::MARK_STATE.load(Ordering::SeqCst) as u8;
-
-    let line_mark_table = shared_space.line_mark_table();
-    let (space_start, space_end) = (shared_space.start(), shared_space.end());
-
-    let trace_map = shared_space.trace_map.ptr;
-
-    for i in 0..objs.len() {
-        let obj = unsafe { *objs.get_unchecked(i) };
-
-        // mark the object as traced
-        crate::objectmodel::mark_as_traced(trace_map, space_start, obj, mark_state);
-
-        // mark meta-data
-        if obj.to_address() >= space_start && obj.to_address() < space_end {
-            line_mark_table.mark_line_live2(space_start, obj.to_address());
-        }
+    for obj in objs {
+        mutator.init_object_no_inline(obj, 0b1100_0011);
+        //        mutator.init_object_no_inline(obj, 0b1100_0111);
     }
 
     let elapsed = time_start.elapsed();

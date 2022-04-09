@@ -1,8 +1,8 @@
-use crate::common::Address;
-use crate::heap;
-use crate::heap::freelist::FreeListSpace;
-use crate::heap::immix::ImmixMutatorLocal;
-use crate::heap::immix::ImmixSpace;
+use immix_rust::common::Address;
+use immix_rust::heap;
+use immix_rust::heap::freelist::FreeListSpace;
+use immix_rust::heap::immix::ImmixMutatorLocal;
+use immix_rust::heap::immix::ImmixSpace;
 use std::time::Instant;
 
 pub const K: usize = 4;

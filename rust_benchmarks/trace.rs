@@ -1,8 +1,8 @@
-use crate::common::Address;
-use crate::heap;
-use crate::heap::freelist::FreeListSpace;
-use crate::heap::immix::ImmixMutatorLocal;
-use crate::heap::immix::ImmixSpace;
+use immix_rust::common::Address;
+use immix_rust::heap;
+use immix_rust::heap::freelist::FreeListSpace;
+use immix_rust::heap::immix::ImmixMutatorLocal;
+use immix_rust::heap::immix::ImmixSpace;
 
 use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
@@ -14,14 +14,6 @@ use crate::exhaust::OBJECT_ALIGN;
 use crate::exhaust::OBJECT_SIZE;
 
 const TRACE_TIMES: usize = ALLOCATION_TIMES;
-
-struct Node<'a> {
-    hdr: u64,
-    next: &'a Node<'a>,
-    unused_ptr: usize,
-    unused_int: i32,
-    unused_int2: i32,
-}
 
 #[allow(unused_variables)]
 pub fn alloc_trace() {
