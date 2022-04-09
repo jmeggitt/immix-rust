@@ -10,12 +10,11 @@ pub const TREE_DEPTH: usize = 10; // 10
 pub const TREE_COUNT: usize = 50; // 50
 
 pub const OBJECT_SIZE: usize = K * 8;
-pub const ACTUAL_OBJECT_SIZE: usize = K * 8;
 pub const OBJECT_ALIGN: usize = 8;
 
 #[inline(always)]
 fn alloc_k_ary_tree(mutator: &mut ImmixMutatorLocal) -> Address {
-    let addr = mutator.alloc(ACTUAL_OBJECT_SIZE, 8);
+    let addr = mutator.alloc(OBJECT_SIZE, OBJECT_ALIGN);
     mutator.init_object(addr, 0b1100_1111);
     addr
 }
@@ -69,7 +68,7 @@ pub fn alloc_trace() {
     );
     println!(
         "Considering header size of {}, an object should be {}. ",
-        0, ACTUAL_OBJECT_SIZE
+        0, OBJECT_SIZE
     );
 
     println!(
@@ -77,7 +76,7 @@ pub fn alloc_trace() {
         TREE_COUNT,
         TREE_DEPTH,
         TREE_COUNT * K.pow(TREE_DEPTH as u32),
-        TREE_COUNT * K.pow(TREE_DEPTH as u32) * ACTUAL_OBJECT_SIZE
+        TREE_COUNT * K.pow(TREE_DEPTH as u32) * OBJECT_SIZE
     );
 
     let mut roots = vec![];

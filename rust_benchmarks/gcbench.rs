@@ -19,12 +19,12 @@ const kMaxTreeDepth: i32 = 16;
 struct Node {
     left: *mut Node,
     right: *mut Node,
-    i: i32,
-    j: i32,
+    _i: i32,
+    _j: i32,
 }
 
 struct Array {
-    value: [f64; kArraySize as usize],
+    _value: [f64; kArraySize as usize],
 }
 
 fn init_Node(me: *mut Node, l: *mut Node, r: *mut Node) {
@@ -86,7 +86,7 @@ fn TimeConstruction(depth: i32, mutator: &mut ImmixMutatorLocal) {
 
     let time_start = Instant::now();
     for _ in 0..iNumIters {
-        let tempTree = MakeTree(depth, mutator);
+        let _tempTree = MakeTree(depth, mutator);
     }
     let elapsed = time_start.elapsed();
     println!("\tButtom up construction took {:?}", elapsed);
@@ -105,9 +105,7 @@ pub fn start() {
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
 
-    unsafe {
-        heap::gc::set_low_water_mark();
-    }
+    heap::gc::set_low_water_mark();
 
     let immix_space: Arc<ImmixSpace> = {
         let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
@@ -135,7 +133,7 @@ pub fn start() {
 
     let time_start = Instant::now();
     // Stretch the memory space quickly
-    let tempTree = MakeTree(kStretchTreeDepth, &mut mutator);
+    let _tempTree = MakeTree(kStretchTreeDepth, &mut mutator);
     // destroy tree
 
     // Create a long lived object

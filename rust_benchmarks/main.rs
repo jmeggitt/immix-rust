@@ -1,7 +1,6 @@
+use immix_rust::{heap, objectmodel};
 use std::env;
 use std::sync::atomic::Ordering;
-use immix_rust::{heap, objectmodel};
-
 
 // mod common;
 // mod heap;

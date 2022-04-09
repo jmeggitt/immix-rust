@@ -21,17 +21,19 @@ const kArraySize: i32 = 500000;
 const kMinTreeDepth: i32 = 4;
 const kMaxTreeDepth: i32 = 16;
 
+#[repr(C)] // Enforce field ordering
 struct Node {
-    hdr: u64,
+    _header: u64,
     left: *mut Node,
     right: *mut Node,
-    i: i32,
-    j: i32,
+    _i: i32,
+    _j: i32,
 }
 
+#[repr(C)] // Enforce field ordering
 struct Array {
-    hdr: u64,
-    value: [f64; kArraySize as usize],
+    _hdr: u64,
+    _value: [f64; kArraySize as usize],
 }
 
 fn init_Node(me: *mut Node, l: *mut Node, r: *mut Node) {
@@ -100,9 +102,7 @@ fn TimeConstruction(depth: i32, mutator: &mut ImmixMutatorLocal) {
 }
 
 fn run_one_test(immix_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
-    unsafe {
-        heap::gc::set_low_water_mark();
-    }
+    heap::gc::set_low_water_mark();
     let mut mutator = ImmixMutatorLocal::new(immix_space);
 
     let mut d = kMinTreeDepth;
@@ -125,9 +125,7 @@ use std::env;
 use std::time::Instant;
 
 pub fn start() {
-    unsafe {
-        heap::gc::set_low_water_mark();
-    }
+    heap::gc::set_low_water_mark();
 
     let n_threads: i32 = {
         let args: Vec<_> = env::args().collect();

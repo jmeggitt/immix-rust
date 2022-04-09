@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::*;
 
 // this table will be accessed through unsafe raw pointers. since Rust doesn't provide a data structure for such guarantees:
-// 1. Non-overlapping segments of this table may be accessed parallelly from different mutator threads
+// 1. Non-overlapping segments of this table may be accessed concurrently from different mutator threads
 // 2. One element may be written into at the same time by different gc threads during tracing
 
 #[derive(Clone)]
@@ -61,6 +61,7 @@ impl LineMarkTable {
     }
 
     #[inline(always)]
+    #[allow(dead_code)]
     fn get(&self, index: usize) -> immix::LineMark {
         debug_assert!(index <= self.len);
         unsafe { *self.ptr.offset(index as isize) }
@@ -130,7 +131,6 @@ pub struct ImmixSpace {
 
     total_blocks: usize, // for debug use
 
-    #[allow(dead_code)]
     mmap: memmap::Mmap,
     usable_blocks: Mutex<LinkedList<Box<ImmixBlock>>>,
     used_blocks: Mutex<LinkedList<Box<ImmixBlock>>>,
