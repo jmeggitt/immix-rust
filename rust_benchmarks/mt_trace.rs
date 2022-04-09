@@ -52,7 +52,6 @@ pub fn alloc_trace() {
 
         Arc::new(space)
     };
-    heap::gc::init(shared_space.clone());
     let mut mutator = ImmixMutatorLocal::new(shared_space.clone());
 
     println!(

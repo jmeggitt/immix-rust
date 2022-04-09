@@ -20,7 +20,6 @@ pub fn alloc_init() {
 
         Arc::new(space)
     };
-    heap::gc::init(shared_space.clone());
 
     let mut mutator = ImmixMutatorLocal::new(shared_space);
 

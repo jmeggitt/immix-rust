@@ -12,10 +12,9 @@ pub const LO_SPACE_RATIO: f64 = 0.2;
 pub const DEFAULT_HEAP_SIZE: usize = 500 << 20;
 
 lazy_static! {
+    // Safe to remove (Only used in benchmarks)
     pub static ref IMMIX_SPACE_SIZE: AtomicUsize =
         AtomicUsize::new((DEFAULT_HEAP_SIZE as f64 * IMMIX_SPACE_RATIO) as usize);
-    pub static ref LO_SPACE_SIZE: AtomicUsize =
-        AtomicUsize::new((DEFAULT_HEAP_SIZE as f64 * LO_SPACE_RATIO) as usize);
 }
 
 #[inline(always)]

@@ -107,7 +107,6 @@ pub fn start() {
         let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
         Arc::new(space)
     };
-    heap::gc::init(immix_space.clone());
     let mut mutator = ImmixMutatorLocal::new(immix_space);
 
     println!("Garbage Collector Test");
@@ -137,7 +136,7 @@ pub fn start() {
     Populate(kLongLivedTreeDepth, longLivedTree, &mut mutator);
 
     println!(" Creating a long-lived array of {} doubles", kArraySize);
-    mutator.alloc(size_of::<Array>(), 8);
+    // TODO: mutator.alloc(size_of::<Array>(), 8);
 
     PrintDiagnostics();
 

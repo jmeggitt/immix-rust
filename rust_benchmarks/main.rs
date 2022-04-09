@@ -26,12 +26,9 @@ fn main() {
                 let immix_space_size: usize = (heap_size as f64 * heap::IMMIX_SPACE_RATIO) as usize;
                 heap::IMMIX_SPACE_SIZE.store(immix_space_size, Ordering::SeqCst);
 
-                let lo_space_size: usize = (heap_size as f64 * heap::LO_SPACE_RATIO) as usize;
-                heap::LO_SPACE_SIZE.store(lo_space_size, Ordering::SeqCst);
-
                 println!(
-                    "heap is {} bytes (immix: {} bytes, lo: {} bytes) . ",
-                    heap_size, immix_space_size, lo_space_size
+                    "heap is {} bytes (immix: {} bytes) . ",
+                    heap_size, immix_space_size
                 );
             } else {
                 println!("unknow heap size variable: {}, ignore", val);

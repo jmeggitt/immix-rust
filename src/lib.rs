@@ -24,7 +24,8 @@ pub struct GC {
 }
 
 lazy_static! {
-    pub static ref MY_GC: RwLock<Option<GC>> = RwLock::new(None);
+    // TODO: Safe to remove once new_mutator is a method for GC
+    static ref MY_GC: RwLock<Option<GC>> = RwLock::new(None);
 }
 
 #[no_mangle]
@@ -41,12 +42,7 @@ pub extern "C" fn gc_init(
 
     let immix_space = Arc::new(ImmixSpace::new(immix_size));
 
-    heap::gc::init(immix_space.clone());
-
-
-    *MY_GC.write() = Some(GC {
-        immix_space,
-    });
+    *MY_GC.write() = Some(GC { immix_space });
     println!(
         "heap is {} bytes (immix: {} bytes, lo: {} bytes) . ",
         immix_size + lo_size,

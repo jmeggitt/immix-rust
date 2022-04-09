@@ -8,15 +8,6 @@ pub use self::immix_mutator::N_MUTATORS;
 pub use self::immix_space::ImmixSpace;
 pub use self::immix_space::LineMarkTable as ImmixLineMarkTable;
 
-use parking_lot::RwLock;
-use std::sync::Arc;
-
-use lazy_static::lazy_static;
-
-lazy_static! {
-    pub static ref SHARED_SPACE: Option<Arc<RwLock<ImmixSpace>>> = None;
-}
-
 pub const LOG_BYTES_IN_LINE: usize = 8;
 pub const BYTES_IN_LINE: usize = 1 << LOG_BYTES_IN_LINE;
 pub const LOG_BYTES_IN_BLOCK: usize = 16;

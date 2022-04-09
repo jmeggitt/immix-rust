@@ -8,26 +8,22 @@ use log::trace;
 use crate::common::Address;
 use crate::common::LOG_POINTER_SIZE;
 
+use generational_arena::{Arena, Index};
 use parking_lot::RwLock;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::*;
 
-const MAX_MUTATORS: usize = 1024;
 lazy_static! {
-    pub static ref MUTATORS: RwLock<Vec<Option<Arc<ImmixMutatorGlobal>>>> = {
-        let mut ret = Vec::with_capacity(MAX_MUTATORS);
-        for _ in 0..MAX_MUTATORS {
-            ret.push(None);
-        }
-        RwLock::new(ret)
-    };
-    pub static ref N_MUTATORS: RwLock<usize> = RwLock::new(0);
+    pub static ref MUTATORS: RwLock<Arena<Arc<ImmixMutatorGlobal>>> = RwLock::new(Arena::with_capacity(1024));
+    // pub static ref N_MUTATORS: RwLock<usize> = RwLock::new(0);
 }
+
+pub static N_MUTATORS: AtomicUsize = AtomicUsize::new(0);
 
 #[repr(C)]
 pub struct ImmixMutatorLocal {
-    id: usize,
+    id: Index,
 
     // use raw pointer here instead of AddressMapTable
     // to avoid indirection in fast path
@@ -69,15 +65,12 @@ impl ImmixMutatorLocal {
     pub fn new(space: Arc<ImmixSpace>) -> ImmixMutatorLocal {
         let global = Arc::new(ImmixMutatorGlobal::new());
 
-        let mut id_lock = N_MUTATORS.write();
-        {
-            let mut mutators_lock = MUTATORS.write();
-            mutators_lock.remove(*id_lock);
-            mutators_lock.insert(*id_lock, Some(global.clone()));
-        }
+        let mut mutators_lock = MUTATORS.write();
+        let id = mutators_lock.insert(global.clone());
+        N_MUTATORS.fetch_add(1, Ordering::SeqCst);
 
-        let ret = ImmixMutatorLocal {
-            id: *id_lock,
+        ImmixMutatorLocal {
+            id,
             cursor: unsafe { Address::zero() },
             limit: unsafe { Address::zero() },
             line: immix::LINES_IN_BLOCK,
@@ -86,10 +79,11 @@ impl ImmixMutatorLocal {
             space_start: space.start(),
             global,
             space,
-        };
-        *id_lock += 1;
+        }
+    }
 
-        ret
+    pub fn immix_space(&self) -> Arc<ImmixSpace> {
+        self.space.clone()
     }
 
     pub fn destroy(&mut self) {
@@ -97,18 +91,14 @@ impl ImmixMutatorLocal {
             self.return_block();
         }
 
-        let mut mutator_count_lock = N_MUTATORS.write();
-
         let mut mutators_lock = MUTATORS.write();
-        mutators_lock.push(None);
-        mutators_lock.swap_remove(self.id);
-
-        *mutator_count_lock -= 1;
+        mutators_lock.remove(self.id);
+        N_MUTATORS.fetch_sub(1, Ordering::SeqCst);
 
         if cfg!(debug_assertions) {
             println!(
                 "destroy mutator. Now live mutators = {}",
-                *mutator_count_lock
+                mutators_lock.len()
             );
         }
     }
@@ -122,7 +112,7 @@ impl ImmixMutatorLocal {
 
     #[inline(never)]
     pub fn yieldpoint_slow(&mut self) {
-        trace!("Mutator{}: yieldpoint triggered, slow path", self.id);
+        trace!("Mutator{:?}: yieldpoint triggered, slow path", self.id);
         gc::sync_barrier(self);
     }
 
@@ -209,7 +199,7 @@ impl ImmixMutatorLocal {
     }
 
     fn alloc_from_global(&mut self, size: usize, align: usize) -> Address {
-        trace!("Mutator{}: slowpath: alloc_from_global", self.id);
+        trace!("Mutator{:?}: slowpath: alloc_from_global", self.id);
 
         self.return_block();
 
@@ -239,7 +229,7 @@ impl ImmixMutatorLocal {
         self.return_block();
     }
 
-    pub fn id(&self) -> usize {
+    pub fn id(&self) -> Index {
         self.id
     }
 

@@ -30,29 +30,16 @@ pub use single_thread_trace::start_trace;
 
 lazy_static! {
     static ref STW_COND: Arc<(Mutex<usize>, Condvar)> = Arc::new((Mutex::new(0), Condvar::new()));
-    static ref GC_CONTEXT: RwLock<GCContext> = RwLock::new(GCContext {
-        immix_space: None,
-    });
     static ref ROOTS: RwLock<Vec<ObjectReference>> = RwLock::new(vec![]);
 }
 
-static CONTROLLER: AtomicIsize = AtomicIsize::new(0);
+static CONTROLLER: AtomicIsize = AtomicIsize::new(NO_CONTROLLER);
 const NO_CONTROLLER: isize = -1;
-
-struct GCContext {
-    immix_space: Option<Arc<ImmixSpace>>,
-}
-
-pub fn init(immix_space: Arc<ImmixSpace>) {
-    CONTROLLER.store(NO_CONTROLLER, Ordering::SeqCst);
-    let mut gccontext = GC_CONTEXT.write();
-    gccontext.immix_space = Some(immix_space);
-}
 
 pub fn trigger_gc() {
     trace!("Triggering GC...");
 
-    for mutator in MUTATORS.write().iter_mut().flatten() {
+    for (_, mutator) in MUTATORS.write().iter_mut() {
         mutator.set_take_yield(true);
     }
 }
@@ -98,15 +85,12 @@ fn is_valid_object(addr: Address, start: Address, end: Address, live_map: &Addre
     common::test_nth_bit(live_map.get(addr), objectmodel::OBJ_START_BIT)
 }
 
-fn stack_scan() -> Vec<ObjectReference> {
+fn stack_scan(immix_space: &ImmixSpace) -> Vec<ObjectReference> {
     let stack_ptr: Address = Address::from_ptr(immmix_get_stack_ptr());
     let low_water_mark: Address = get_low_water_mark();
 
     let mut cursor = stack_ptr;
     let mut ret = vec![];
-
-    let gccontext = GC_CONTEXT.read();
-    let immix_space = gccontext.immix_space.as_ref().unwrap();
 
     while cursor < low_water_mark {
         let value: Address = unsafe { cursor.load::<Address>() };
@@ -177,15 +161,16 @@ fn stack_scan() -> Vec<ObjectReference> {
 
 #[inline(never)]
 pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
+    let (direct_index, _) = mutator.id().into_raw_parts();
     let controller_id = CONTROLLER.compare_exchange(
         NO_CONTROLLER,
-        mutator.id() as isize,
+        direct_index as isize,
         Ordering::SeqCst,
         Ordering::SeqCst,
     );
 
     trace!(
-        "Mutator{} saw the controller is {:?}",
+        "Mutator{:?} saw the controller is {:?}",
         mutator.id(),
         controller_id
     );
@@ -194,7 +179,7 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
     mutator.prepare_for_gc();
 
     // scan its stack
-    let mut thread_roots = stack_scan();
+    let mut thread_roots = stack_scan(&*mutator.immix_space());
     ROOTS.write().append(&mut thread_roots);
 
     // user thread call back to prepare for gc
@@ -202,7 +187,7 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
 
     match controller_id {
         Err(controller) => {
-            assert_ne!(controller, mutator.id() as isize);
+            assert_ne!(controller, direct_index as isize);
 
             // this thread will block
             block_current_thread(mutator);
@@ -218,8 +203,11 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
             let &(ref lock, ref cvar) = &*STW_COND.clone();
             let mut count = 0;
 
-            trace!("expect {} mutators to park", *N_MUTATORS.read() - 1);
-            while count < *N_MUTATORS.read() - 1 {
+            trace!(
+                "expect {} mutators to park",
+                N_MUTATORS.load(Ordering::SeqCst) - 1
+            );
+            while count < N_MUTATORS.load(Ordering::SeqCst) - 1 {
                 let new_count = { *lock.lock() };
                 if new_count != count {
                     count = new_count;
@@ -230,16 +218,13 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
             trace!("everyone stopped, gc will start");
 
             // roots->trace->sweep
-            gc();
+            gc(mutator.immix_space());
 
             // mutators will resume
             CONTROLLER.store(NO_CONTROLLER, Ordering::SeqCst);
-            for t in MUTATORS.write().iter_mut() {
-                if t.is_some() {
-                    let t_mut = t.as_mut().unwrap();
-                    t_mut.set_take_yield(false);
-                    t_mut.set_still_blocked(false);
-                }
+            for (_, mutator) in MUTATORS.write().iter_mut() {
+                mutator.set_take_yield(false);
+                mutator.set_still_blocked(false);
             }
             // every mutator thread will reset themselves, so only reset current mutator here
             mutator.reset();
@@ -255,7 +240,7 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
 }
 
 fn block_current_thread(mutator: &mut ImmixMutatorLocal) {
-    trace!("Mutator{} blocked", mutator.id());
+    trace!("Mutator{:?} blocked", mutator.id());
 
     let &(ref lock, ref cvar) = &*STW_COND.clone();
     let mut count = lock.lock();
@@ -267,7 +252,7 @@ fn block_current_thread(mutator: &mut ImmixMutatorLocal) {
         cvar.wait(&mut count);
     }
 
-    trace!("Mutator{} unblocked", mutator.id());
+    trace!("Mutator{:?} unblocked", mutator.id());
 }
 
 static GC_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -276,7 +261,7 @@ pub fn gc_count() -> usize {
     GC_COUNT.load(Ordering::SeqCst)
 }
 
-fn gc() {
+fn gc(immix_space: Arc<ImmixSpace>) {
     GC_COUNT.fetch_add(1, Ordering::SeqCst);
 
     trace!("GC starts");
@@ -285,22 +270,12 @@ fn gc() {
     let roots: &mut Vec<ObjectReference> = &mut ROOTS.write();
 
     // mark & trace
-    {
-        let gccontext = GC_CONTEXT.read();
-        let immix_space = gccontext.immix_space.as_ref().unwrap();
-
-        start_trace(roots, immix_space.clone());
-    }
+    start_trace(roots, immix_space.clone());
 
     trace!("trace done");
 
     // sweep
-    {
-        let mut gccontext = GC_CONTEXT.write();
-        let immix_space = gccontext.immix_space.as_mut().unwrap();
-
-        immix_space.sweep();
-    }
+    immix_space.sweep();
 
     objectmodel::flip_mark_state();
     trace!("GC finishes");
