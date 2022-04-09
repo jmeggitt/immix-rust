@@ -3,10 +3,10 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
 
+use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
-use parking_lot::RwLock;
 
 use crate::heap;
 use crate::heap::freelist;

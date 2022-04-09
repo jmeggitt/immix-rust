@@ -17,7 +17,6 @@ impl Address {
     pub fn plus(&self, bytes: usize) -> Self {
         Address(self.0 + bytes)
     }
-    #[allow(dead_code)]
     #[inline(always)]
     pub fn sub(&self, bytes: usize) -> Self {
         Address(self.0 - bytes)

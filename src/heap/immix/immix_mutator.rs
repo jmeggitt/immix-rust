@@ -8,9 +8,9 @@ use log::trace;
 use crate::common::Address;
 use crate::common::LOG_POINTER_SIZE;
 
+use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use parking_lot::RwLock;
 use std::*;
 
 const MAX_MUTATORS: usize = 1024;

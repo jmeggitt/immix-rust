@@ -4,9 +4,9 @@ use crate::heap::freelist::FreeListSpace;
 use crate::heap::immix::ImmixMutatorLocal;
 use crate::heap::immix::ImmixSpace;
 
+use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use parking_lot::RwLock;
 use std::time::Instant;
 
 use crate::exhaust::ALLOCATION_TIMES;

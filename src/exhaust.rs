@@ -11,7 +11,6 @@ pub const OBJECT_ALIGN: usize = 8;
 
 pub const ALLOCATION_TIMES: usize = 50000000;
 
-#[allow(unused_variables)]
 pub fn exhaust_alloc() {
     use std::sync::atomic::Ordering;
     use std::sync::Arc;

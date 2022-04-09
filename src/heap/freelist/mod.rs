@@ -2,9 +2,9 @@ use crate::common::Address;
 use crate::heap::{gc, immix};
 use std::alloc::{GlobalAlloc, Layout, System};
 
+use parking_lot::RwLock;
 use std::collections::LinkedList;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 pub struct FreeListSpace {
     current_nodes: LinkedList<Box<FreeListNode>>,
@@ -20,12 +20,10 @@ impl FreeListSpace {
         FreeListSpace {
             current_nodes: LinkedList::new(),
             node_id: 0,
-            size: size,
+            size,
             used_bytes: 0,
         }
     }
-
-    pub fn mark(&mut self, obj: Address) {}
 
     pub fn alloc(&mut self, size: usize, align: usize) -> Option<Address> {
         if self.used_bytes + size > self.size {

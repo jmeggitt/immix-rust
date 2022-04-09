@@ -3,9 +3,9 @@ use crate::common::AddressMap;
 use crate::heap::gc;
 use crate::heap::immix;
 
+use parking_lot::Mutex;
 use std::collections::LinkedList;
 use std::sync::Arc;
-use parking_lot::Mutex;
 use std::*;
 
 // this table will be accessed through unsafe raw pointers. since Rust doesn't provide a data structure for such guarantees:
@@ -213,8 +213,7 @@ impl ImmixSpace {
 
     #[allow(unreachable_code)]
     pub fn get_next_usable_block(&self) -> Option<Box<ImmixBlock>> {
-        let res_new_block: Option<Box<ImmixBlock>> =
-            { self.usable_blocks.lock().pop_front() };
+        let res_new_block: Option<Box<ImmixBlock>> = { self.usable_blocks.lock().pop_front() };
         if res_new_block.is_none() {
             // should unlock, and call GC here
             gc::trigger_gc();

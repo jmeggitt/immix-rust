@@ -1,5 +1,3 @@
-use std::arch::asm;
-use std::ptr::null_mut;
 use crate::heap::freelist::FreeListSpace;
 use crate::heap::immix::ImmixLineMarkTable;
 use crate::heap::immix::ImmixMutatorLocal;
@@ -7,6 +5,8 @@ use crate::heap::immix::ImmixSpace;
 use crate::heap::immix::MUTATORS;
 use crate::heap::immix::N_MUTATORS;
 use crate::objectmodel;
+use std::arch::asm;
+use std::ptr::null_mut;
 
 use crate::common;
 use crate::common::AddressMap;
@@ -14,9 +14,9 @@ use crate::common::{Address, ObjectReference};
 
 use lazy_static::lazy_static;
 use log::trace;
+use parking_lot::{Condvar, Mutex, RwLock};
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
-use parking_lot::{Condvar, Mutex, RwLock};
 
 #[cfg(feature = "mt-trace")]
 use crossbeam::deque::{Steal, Stealer, Worker};
@@ -31,8 +31,6 @@ use std::sync::atomic;
 
 lazy_static! {
     static ref STW_COND: Arc<(Mutex<usize>, Condvar)> = Arc::new((Mutex::new(0), Condvar::new()));
-    static ref GET_ROOTS: RwLock<Box<dyn Fn() -> Vec<ObjectReference> + Sync + Send>> =
-        RwLock::new(Box::new(get_roots));
     static ref GC_CONTEXT: RwLock<GCContext> = RwLock::new(GCContext {
         immix_space: None,
         lo_space: None
@@ -48,19 +46,11 @@ pub struct GCContext {
     lo_space: Option<Arc<RwLock<FreeListSpace>>>,
 }
 
-fn get_roots() -> Vec<ObjectReference> {
-    vec![]
-}
-
 pub fn init(immix_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
     CONTROLLER.store(NO_CONTROLLER, Ordering::SeqCst);
     let mut gccontext = GC_CONTEXT.write();
     gccontext.immix_space = Some(immix_space);
     gccontext.lo_space = Some(lo_space);
-}
-
-pub fn init_get_roots(get_roots: Box<dyn Fn() -> Vec<ObjectReference> + Sync + Send>) {
-    *GET_ROOTS.write() = get_roots;
 }
 
 pub fn trigger_gc() {
@@ -74,7 +64,7 @@ pub fn trigger_gc() {
 }
 
 fn immmix_get_stack_ptr() -> *mut () {
-    let mut ret: *mut () = null_mut();
+    let mut ret: *mut ();
 
     #[cfg(target_arch = "x86_64")]
     unsafe {
@@ -88,6 +78,7 @@ fn immmix_get_stack_ptr() -> *mut () {
 
     // Bootstrap hack to get stack pointer. Should work on any system... probably
     if cfg!(not(any(target_arch = "x86_64", target_arch = "x86"))) {
+        ret = null_mut();
         ret = &mut ret as *mut _ as *mut ();
     }
 
@@ -105,7 +96,6 @@ pub fn set_low_water_mark() {
 fn get_low_water_mark() -> Address {
     Address::from_ptr(LOW_WATER_MARK.with(|v| *v))
 }
-
 
 #[inline(always)]
 pub fn is_valid_object(
@@ -200,10 +190,15 @@ pub fn stack_scan() -> Vec<ObjectReference> {
 
 #[inline(never)]
 pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
-    let controller_id = CONTROLLER.compare_and_swap(-1, mutator.id() as isize, Ordering::SeqCst);
+    let controller_id = CONTROLLER.compare_exchange(
+        NO_CONTROLLER,
+        mutator.id() as isize,
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+    );
 
     trace!(
-        "Mutator{} saw the controller is {}",
+        "Mutator{} saw the controller is {:?}",
         mutator.id(),
         controller_id
     );
@@ -218,54 +213,56 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
     // user thread call back to prepare for gc
     //    USER_THREAD_PREPARE_FOR_GC.read()();
 
-    if controller_id != NO_CONTROLLER {
-        // this thread will block
-        block_current_thread(mutator);
+    match controller_id {
+        Err(controller) => {
+            assert_ne!(controller, mutator.id() as isize);
 
-        // reset current mutator
-        mutator.reset();
-    } else {
-        // this thread is controller
-        // other threads should block
+            // this thread will block
+            block_current_thread(mutator);
 
-        // wait for all mutators to be blocked
-        let &(ref lock, ref cvar) = &*STW_COND.clone();
-        let mut count = 0;
-
-        trace!(
-            "expect {} mutators to park",
-            *N_MUTATORS.read() - 1
-        );
-        while count < *N_MUTATORS.read() - 1 {
-            let new_count = { *lock.lock() };
-            if new_count != count {
-                count = new_count;
-                trace!("count = {}", count);
-            }
+            // reset current mutator
+            mutator.reset();
         }
+        Ok(_) => {
+            // this thread is controller
+            // other threads should block
 
-        trace!("everyone stopped, gc will start");
+            // wait for all mutators to be blocked
+            let &(ref lock, ref cvar) = &*STW_COND.clone();
+            let mut count = 0;
 
-        // roots->trace->sweep
-        gc();
-
-        // mutators will resume
-        CONTROLLER.store(NO_CONTROLLER, Ordering::SeqCst);
-        for t in MUTATORS.write().iter_mut() {
-            if t.is_some() {
-                let t_mut = t.as_mut().unwrap();
-                t_mut.set_take_yield(false);
-                t_mut.set_still_blocked(false);
+            trace!("expect {} mutators to park", *N_MUTATORS.read() - 1);
+            while count < *N_MUTATORS.read() - 1 {
+                let new_count = { *lock.lock() };
+                if new_count != count {
+                    count = new_count;
+                    trace!("count = {}", count);
+                }
             }
-        }
-        // every mutator thread will reset themselves, so only reset current mutator here
-        mutator.reset();
 
-        // resume
-        {
-            let mut count = lock.lock();
-            *count = 0;
-            cvar.notify_all();
+            trace!("everyone stopped, gc will start");
+
+            // roots->trace->sweep
+            gc();
+
+            // mutators will resume
+            CONTROLLER.store(NO_CONTROLLER, Ordering::SeqCst);
+            for t in MUTATORS.write().iter_mut() {
+                if t.is_some() {
+                    let t_mut = t.as_mut().unwrap();
+                    t_mut.set_take_yield(false);
+                    t_mut.set_still_blocked(false);
+                }
+            }
+            // every mutator thread will reset themselves, so only reset current mutator here
+            mutator.reset();
+
+            // resume
+            {
+                let mut count = lock.lock();
+                *count = 0;
+                cvar.notify_all();
+            }
         }
     }
 }
@@ -329,7 +326,6 @@ pub const MULTI_THREAD_TRACE_THRESHOLD: usize = 10;
 pub const PUSH_BACK_THRESHOLD: usize = 50;
 pub static GC_THREADS: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
 
-#[allow(unused_variables)]
 #[inline(never)]
 #[cfg(feature = "mt-trace")]
 pub fn start_trace(
@@ -378,7 +374,6 @@ pub fn start_trace(
     }
 }
 
-#[allow(unused_variables)]
 #[inline(never)]
 #[cfg(not(feature = "mt-trace"))]
 pub fn start_trace(
@@ -402,7 +397,6 @@ pub fn start_trace(
     }
 }
 
-#[allow(unused_variables)]
 #[cfg(feature = "mt-trace")]
 fn start_steal_trace(
     stealer: Stealer<ObjectReference>,

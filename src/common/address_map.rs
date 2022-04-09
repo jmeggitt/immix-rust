@@ -1,9 +1,7 @@
 use std::alloc::{GlobalAlloc, Layout, System};
-use libc;
 
 use crate::common::Address;
 use crate::common::LOG_POINTER_SIZE;
-use std::mem;
 
 #[derive(Clone)]
 pub struct AddressMap<T> {
@@ -22,7 +20,12 @@ impl<T> AddressMap<T> {
         let layout = Layout::array::<T>(len).unwrap();
         let ptr = unsafe { System.alloc_zeroed(layout) as *mut T };
 
-        AddressMap { start, end, ptr, layout }
+        AddressMap {
+            start,
+            end,
+            ptr,
+            layout,
+        }
     }
 
     #[inline(always)]

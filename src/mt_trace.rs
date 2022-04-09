@@ -46,9 +46,9 @@ fn make_tree(depth: usize, mutator: &mut ImmixMutatorLocal) -> Address {
 
 #[allow(unused_variables)]
 pub fn alloc_trace() {
+    use parking_lot::RwLock;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
-    use parking_lot::RwLock;
 
     let shared_space: Arc<ImmixSpace> = {
         let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));

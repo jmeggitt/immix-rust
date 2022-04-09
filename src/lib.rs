@@ -10,12 +10,12 @@ use heap::freelist;
 use heap::freelist::FreeListSpace;
 use heap::immix::ImmixMutatorLocal;
 use heap::immix::ImmixSpace;
+use parking_lot::RwLock;
 use std::boxed::Box;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
-pub use heap::immix::ImmixMutatorLocal as Mutator;
 pub use heap::gc::set_low_water_mark;
+pub use heap::immix::ImmixMutatorLocal as Mutator;
 
 #[repr(C)]
 pub struct GC {

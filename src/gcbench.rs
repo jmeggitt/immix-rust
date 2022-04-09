@@ -1,7 +1,6 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
-#![allow(unused_variables)]
 
 use crate::heap;
 use crate::heap::freelist;
@@ -102,9 +101,9 @@ fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
 }
 
 pub fn start() {
+    use parking_lot::RwLock;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
-    use parking_lot::RwLock;
 
     unsafe {
         heap::gc::set_low_water_mark();

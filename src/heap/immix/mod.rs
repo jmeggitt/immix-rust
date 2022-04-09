@@ -8,8 +8,8 @@ pub use self::immix_mutator::N_MUTATORS;
 pub use self::immix_space::ImmixSpace;
 pub use self::immix_space::LineMarkTable as ImmixLineMarkTable;
 
-use std::sync::Arc;
 use parking_lot::RwLock;
+use std::sync::Arc;
 
 use lazy_static::lazy_static;
 
