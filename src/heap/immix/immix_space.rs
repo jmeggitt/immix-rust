@@ -3,7 +3,9 @@ use crate::common::AddressMap;
 use crate::heap::gc;
 use crate::heap::immix;
 
+use crate::heap::immix::LineMark;
 use parking_lot::Mutex;
+use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::LinkedList;
 use std::sync::Arc;
 use std::*;
@@ -19,21 +21,13 @@ pub struct LineMarkTable {
     len: usize,
 }
 
-#[derive(Clone)]
-pub struct LineMarkTableSlice {
-    ptr: *mut immix::LineMark,
-    len: usize,
-}
-
 impl LineMarkTable {
     pub fn new(space_start: Address, space_end: Address) -> LineMarkTable {
         let line_mark_table_len = space_end.diff(space_start) / immix::BYTES_IN_LINE;
         let line_mark_table = {
-            let ret = unsafe {
-                libc::malloc(
-                    (mem::size_of::<immix::LineMark>() * line_mark_table_len) as libc::size_t,
-                )
-            } as *mut immix::LineMark;
+            // TODO: This could likely be replaced with a Vec
+            let layout = Layout::array::<LineMark>(line_mark_table_len).unwrap();
+            let ret = unsafe { System.alloc(layout) as *mut immix::LineMark };
             let mut cursor = ret;
 
             for _ in 0..line_mark_table_len {
@@ -94,6 +88,19 @@ impl LineMarkTable {
             self.set(line_table_index + 1, immix::LineMark::ConservLive);
         }
     }
+}
+
+impl Drop for LineMarkTable {
+    fn drop(&mut self) {
+        let layout = Layout::array::<LineMark>(self.len).unwrap();
+        unsafe { System.dealloc(self.ptr as *mut u8, layout) }
+    }
+}
+
+#[derive(Clone)]
+pub struct LineMarkTableSlice {
+    ptr: *mut immix::LineMark,
+    len: usize,
 }
 
 impl LineMarkTableSlice {
