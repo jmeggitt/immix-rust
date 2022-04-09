@@ -3,7 +3,7 @@ use crate::heap::freelist::FreeListSpace;
 use crate::heap::immix::ImmixMutatorLocal;
 use crate::heap::immix::ImmixSpace;
 
-use std::sync::RwLock;
+use parking_lot::RwLock;
 use std::time::Instant;
 
 pub const OBJECT_SIZE: usize = 24;

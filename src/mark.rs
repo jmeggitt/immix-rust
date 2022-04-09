@@ -6,7 +6,7 @@ use crate::heap::immix::ImmixSpace;
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::sync::RwLock;
+use parking_lot::RwLock;
 use std::time::Instant;
 
 use crate::exhaust::ALLOCATION_TIMES;

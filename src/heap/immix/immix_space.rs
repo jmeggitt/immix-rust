@@ -5,7 +5,7 @@ use crate::heap::immix;
 
 use std::collections::LinkedList;
 use std::sync::Arc;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use std::*;
 
 // this table will be accessed through unsafe raw pointers. since Rust doesn't provide a data structure for such guarantees:
@@ -185,7 +185,7 @@ impl ImmixSpace {
         let mut block_start = self.start;
         let mut line = 0;
 
-        let mut usable_blocks_lock = self.usable_blocks.lock().unwrap();
+        let mut usable_blocks_lock = self.usable_blocks.lock();
 
         while block_start.plus(immix::BYTES_IN_BLOCK) <= self.end {
             usable_blocks_lock.push_back(Box::new(ImmixBlock {
@@ -208,13 +208,13 @@ impl ImmixSpace {
         // This avoids explicit ownership transferring
         // If we explicitly transfer ownership, the function needs to own the Mutator in order to move the ImmixBlock out of it (see ImmixMutatorLocal.alloc_from_global()),
         // and this will result in passing the Mutator object as value (instead of a borrowed reference) all the way in the allocation
-        self.used_blocks.lock().unwrap().push_front(old);
+        self.used_blocks.lock().push_front(old);
     }
 
     #[allow(unreachable_code)]
     pub fn get_next_usable_block(&self) -> Option<Box<ImmixBlock>> {
         let res_new_block: Option<Box<ImmixBlock>> =
-            { self.usable_blocks.lock().unwrap().pop_front() };
+            { self.usable_blocks.lock().pop_front() };
         if res_new_block.is_none() {
             // should unlock, and call GC here
             gc::trigger_gc();
@@ -231,8 +231,8 @@ impl ImmixSpace {
         let mut usable_blocks = 0;
         let mut full_blocks = 0;
 
-        let mut used_blocks_lock = self.used_blocks.lock().unwrap();
-        let mut usable_blocks_lock = self.usable_blocks.lock().unwrap();
+        let mut used_blocks_lock = self.used_blocks.lock();
+        let mut usable_blocks_lock = self.usable_blocks.lock();
 
         let mut live_blocks: LinkedList<Box<ImmixBlock>> = LinkedList::new();
 

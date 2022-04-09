@@ -103,7 +103,8 @@ fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
 
 pub fn start() {
     use std::sync::atomic::Ordering;
-    use std::sync::{Arc, RwLock};
+    use std::sync::Arc;
+    use parking_lot::RwLock;
 
     unsafe {
         heap::gc::set_low_water_mark();

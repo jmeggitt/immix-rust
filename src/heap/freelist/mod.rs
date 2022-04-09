@@ -4,7 +4,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 
 use std::collections::LinkedList;
 use std::sync::Arc;
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 pub struct FreeListSpace {
     current_nodes: LinkedList<Box<FreeListNode>>,
@@ -122,7 +122,7 @@ pub fn alloc_large(
         mutator.yieldpoint();
 
         let ret_addr = {
-            let mut lo_space_lock = space.write().unwrap();
+            let mut lo_space_lock = space.write();
             lo_space_lock.alloc(size, align)
         };
 

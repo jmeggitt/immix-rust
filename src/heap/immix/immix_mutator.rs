@@ -10,7 +10,7 @@ use crate::common::LOG_POINTER_SIZE;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::sync::RwLock;
+use parking_lot::RwLock;
 use std::*;
 
 const MAX_MUTATORS: usize = 1024;
@@ -68,9 +68,9 @@ impl ImmixMutatorLocal {
     pub fn new(space: Arc<ImmixSpace>) -> ImmixMutatorLocal {
         let global = Arc::new(ImmixMutatorGlobal::new());
 
-        let mut id_lock = N_MUTATORS.write().unwrap();
+        let mut id_lock = N_MUTATORS.write();
         {
-            let mut mutators_lock = MUTATORS.write().unwrap();
+            let mut mutators_lock = MUTATORS.write();
             mutators_lock.remove(*id_lock);
             mutators_lock.insert(*id_lock, Some(global.clone()));
         }
@@ -96,9 +96,9 @@ impl ImmixMutatorLocal {
             self.return_block();
         }
 
-        let mut mutator_count_lock = N_MUTATORS.write().unwrap();
+        let mut mutator_count_lock = N_MUTATORS.write();
 
-        let mut mutators_lock = MUTATORS.write().unwrap();
+        let mut mutators_lock = MUTATORS.write();
         mutators_lock.push(None);
         mutators_lock.swap_remove(self.id);
 

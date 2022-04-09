@@ -8,12 +8,14 @@ pub mod objectmodel;
 use common::ObjectReference;
 use heap::freelist;
 use heap::freelist::FreeListSpace;
-pub use heap::immix::ImmixMutatorLocal as Mutator;
 use heap::immix::ImmixMutatorLocal;
 use heap::immix::ImmixSpace;
 use std::boxed::Box;
 use std::sync::Arc;
-use std::sync::RwLock;
+use parking_lot::RwLock;
+
+pub use heap::immix::ImmixMutatorLocal as Mutator;
+pub use heap::gc::set_low_water_mark;
 
 #[repr(C)]
 pub struct GC {
@@ -43,7 +45,7 @@ pub extern "C" fn gc_init(immix_size: usize, lo_size: usize, n_gcthreads: usize)
         (immix_space, lo_space)
     };
 
-    *MY_GC.write().unwrap() = Some(GC {
+    *MY_GC.write() = Some(GC {
         immix_space: immix_space,
         lo_space: lo_space,
     });
@@ -65,7 +67,7 @@ pub extern "C" fn gc_init(immix_size: usize, lo_size: usize, n_gcthreads: usize)
 #[no_mangle]
 pub extern "C" fn new_mutator() -> Box<ImmixMutatorLocal> {
     Box::new(ImmixMutatorLocal::new(
-        MY_GC.read().unwrap().as_ref().unwrap().immix_space.clone(),
+        MY_GC.read().as_ref().unwrap().immix_space.clone(),
     ))
 }
 
@@ -73,12 +75,6 @@ pub extern "C" fn new_mutator() -> Box<ImmixMutatorLocal> {
 #[allow(unused_variables)]
 pub extern "C" fn drop_mutator(mutator: Box<ImmixMutatorLocal>) {
     // rust will reclaim the boxed mutator
-}
-
-#[cfg(target_arch = "x86_64")]
-#[link(name = "gc_clib_x64")]
-extern "C" {
-    pub fn set_low_water_mark();
 }
 
 #[no_mangle]
@@ -123,7 +119,7 @@ pub extern "C" fn alloc_large(
         size,
         8,
         mutator,
-        MY_GC.read().unwrap().as_ref().unwrap().lo_space.clone(),
+        MY_GC.read().as_ref().unwrap().lo_space.clone(),
     );
     unsafe { ret.to_object_reference() }
 }

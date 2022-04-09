@@ -4,8 +4,9 @@
 #![allow(unused_variables)]
 
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread;
+use parking_lot::RwLock;
 
 use crate::heap;
 use crate::heap::freelist;

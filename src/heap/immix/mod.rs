@@ -9,7 +9,7 @@ pub use self::immix_space::ImmixSpace;
 pub use self::immix_space::LineMarkTable as ImmixLineMarkTable;
 
 use std::sync::Arc;
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 use lazy_static::lazy_static;
 
