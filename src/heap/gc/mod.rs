@@ -1,3 +1,5 @@
+use std::arch::asm;
+use std::ptr::null_mut;
 use crate::heap::freelist::FreeListSpace;
 use crate::heap::immix::ImmixLineMarkTable;
 use crate::heap::immix::ImmixMutatorLocal;
@@ -13,7 +15,8 @@ use crate::common::{Address, ObjectReference};
 use lazy_static::lazy_static;
 use log::trace;
 use std::sync::atomic::{AtomicIsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, RwLock};
+use std::sync::Arc;
+use parking_lot::{Condvar, Mutex, RwLock};
 
 #[cfg(feature = "mt-trace")]
 use crossbeam::deque::{Steal, Stealer, Worker};
@@ -51,35 +54,58 @@ fn get_roots() -> Vec<ObjectReference> {
 
 pub fn init(immix_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
     CONTROLLER.store(NO_CONTROLLER, Ordering::SeqCst);
-    let mut gccontext = GC_CONTEXT.write().unwrap();
+    let mut gccontext = GC_CONTEXT.write();
     gccontext.immix_space = Some(immix_space);
     gccontext.lo_space = Some(lo_space);
 }
 
 pub fn init_get_roots(get_roots: Box<dyn Fn() -> Vec<ObjectReference> + Sync + Send>) {
-    *GET_ROOTS.write().unwrap() = get_roots;
+    *GET_ROOTS.write() = get_roots;
 }
 
 pub fn trigger_gc() {
     trace!("Triggering GC...");
 
-    for m in MUTATORS.write().unwrap().iter_mut() {
+    for m in MUTATORS.write().iter_mut() {
         if m.is_some() {
             m.as_mut().unwrap().set_take_yield(true);
         }
     }
 }
 
-#[cfg(target_arch = "x86_64")]
-#[link(name = "gc_clib_x64")]
-extern "C" {
-    pub fn malloc_zero(size: libc::size_t) -> *const libc::c_void;
-    fn immmix_get_stack_ptr() -> Address;
-    pub fn set_low_water_mark();
-    fn get_low_water_mark() -> Address;
-    fn get_registers() -> *const Address;
-    fn get_registers_count() -> i32;
+fn immmix_get_stack_ptr() -> *mut () {
+    let mut ret: *mut () = null_mut();
+
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        asm!("mov {0}, rsp", out(reg) ret);
+    }
+
+    #[cfg(target_arch = "x86")]
+    unsafe {
+        asm!("mov {0}, esp", out(reg) ret);
+    }
+
+    // Bootstrap hack to get stack pointer. Should work on any system... probably
+    if cfg!(not(any(target_arch = "x86_64", target_arch = "x86"))) {
+        ret = &mut ret as *mut _ as *mut ();
+    }
+
+    ret
 }
+
+thread_local!(static LOW_WATER_MARK: *mut () = null_mut());
+
+pub fn set_low_water_mark() {
+    LOW_WATER_MARK.with(|f| unsafe {
+        *(f as *const _ as *mut _) = immmix_get_stack_ptr();
+    });
+}
+
+fn get_low_water_mark() -> Address {
+    Address::from_ptr(LOW_WATER_MARK.with(|v| *v))
+}
+
 
 #[inline(always)]
 pub fn is_valid_object(
@@ -96,13 +122,13 @@ pub fn is_valid_object(
 }
 
 pub fn stack_scan() -> Vec<ObjectReference> {
-    let stack_ptr: Address = unsafe { immmix_get_stack_ptr() };
-    let low_water_mark: Address = unsafe { get_low_water_mark() };
+    let stack_ptr: Address = Address::from_ptr(immmix_get_stack_ptr());
+    let low_water_mark: Address = get_low_water_mark();
 
     let mut cursor = stack_ptr;
     let mut ret = vec![];
 
-    let gccontext = GC_CONTEXT.read().unwrap();
+    let gccontext = GC_CONTEXT.read();
     let immix_space = gccontext.immix_space.as_ref().unwrap();
 
     while cursor < low_water_mark {
@@ -122,21 +148,44 @@ pub fn stack_scan() -> Vec<ObjectReference> {
 
     let roots_from_stack = ret.len();
 
-    let registers_count = unsafe { get_registers_count() };
-    let registers = unsafe { get_registers() };
-
-    for i in 0..registers_count {
-        let value = unsafe { *registers.offset(i as isize) };
-
-        if is_valid_object(
-            value,
-            immix_space.start(),
-            immix_space.end(),
-            &immix_space.alloc_map,
-        ) {
-            ret.push(unsafe { value.to_object_reference() });
-        }
+    macro_rules! store_registers {
+        ($arch:literal: $($reg:ident)+) => {
+            #[cfg(target_arch = $arch)]
+            #[allow(non_snake_case)]
+            unsafe {
+                $(store_registers!(@fetch $reg);)+
+                $(store_registers!(@store $reg);)+
+            }
+        };
+        (@fetch $reg:ident) => {
+            let mut $reg: *mut ();
+            asm!(concat!("mov {0}, ", stringify!($reg)), out(reg) $reg);
+        };
+        (@store $reg:ident) => {
+            if is_valid_object(
+                Address::from_ptr($reg),
+                immix_space.start(),
+                immix_space.end(),
+                &immix_space.alloc_map,
+            ) {
+                ret.push(Address::from_ptr($reg).to_object_reference());
+            }
+        };
     }
+
+    // This also checks registers that wouldn't make sense to store an object pointer in (ex: stack
+    // pointers). Maybe consider removing later.
+    store_registers!("x86_64": rax rbx rcx rdx rbp rsp rsi rdi r8 r9 r10 r11 r12 r13 r14 r15);
+    store_registers!("x86": eax ebx ecx edx esi edi esp ebp);
+
+    // TODO: Not sure if this is correct, but include all architectures with asm support
+    store_registers!("arm": R0 R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 SP LR);
+    store_registers!("aarch64": W0 W1 W2 W3 W4 W5 W6 W7 W8 W9 W10 W11 W12 W13 W14 W15 W16 W17 W18
+        W19 W20 W21 W22 W23 W24 W25 W26 W27 W28 W29 W30);
+    store_registers!("riscv32": x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19
+        x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30 x31);
+    store_registers!("riscv64": x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19
+        x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30 x31);
 
     let roots_from_registers = ret.len() - roots_from_stack;
 
@@ -164,10 +213,10 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
 
     // scan its stack
     let mut thread_roots = stack_scan();
-    ROOTS.write().unwrap().append(&mut thread_roots);
+    ROOTS.write().append(&mut thread_roots);
 
     // user thread call back to prepare for gc
-    //    USER_THREAD_PREPARE_FOR_GC.read().unwrap()();
+    //    USER_THREAD_PREPARE_FOR_GC.read()();
 
     if controller_id != NO_CONTROLLER {
         // this thread will block
@@ -185,10 +234,10 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
 
         trace!(
             "expect {} mutators to park",
-            *N_MUTATORS.read().unwrap() - 1
+            *N_MUTATORS.read() - 1
         );
-        while count < *N_MUTATORS.read().unwrap() - 1 {
-            let new_count = { *lock.lock().unwrap() };
+        while count < *N_MUTATORS.read() - 1 {
+            let new_count = { *lock.lock() };
             if new_count != count {
                 count = new_count;
                 trace!("count = {}", count);
@@ -202,7 +251,7 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
 
         // mutators will resume
         CONTROLLER.store(NO_CONTROLLER, Ordering::SeqCst);
-        for t in MUTATORS.write().unwrap().iter_mut() {
+        for t in MUTATORS.write().iter_mut() {
             if t.is_some() {
                 let t_mut = t.as_mut().unwrap();
                 t_mut.set_take_yield(false);
@@ -214,7 +263,7 @@ pub fn sync_barrier(mutator: &mut ImmixMutatorLocal) {
 
         // resume
         {
-            let mut count = lock.lock().unwrap();
+            let mut count = lock.lock();
             *count = 0;
             cvar.notify_all();
         }
@@ -225,13 +274,13 @@ fn block_current_thread(mutator: &mut ImmixMutatorLocal) {
     trace!("Mutator{} blocked", mutator.id());
 
     let &(ref lock, ref cvar) = &*STW_COND.clone();
-    let mut count = lock.lock().unwrap();
+    let mut count = lock.lock();
     *count += 1;
 
     mutator.global.set_still_blocked(true);
 
     while mutator.global.is_still_blocked() {
-        count = cvar.wait(count).unwrap();
+        cvar.wait(&mut count);
     }
 
     trace!("Mutator{} unblocked", mutator.id());
@@ -248,11 +297,11 @@ fn gc() {
     trace!("GC starts");
 
     // creates root deque
-    let mut roots: &mut Vec<ObjectReference> = &mut ROOTS.write().unwrap();
+    let mut roots: &mut Vec<ObjectReference> = &mut ROOTS.write();
 
     // mark & trace
     {
-        let gccontext = GC_CONTEXT.read().unwrap();
+        let gccontext = GC_CONTEXT.read();
         let (immix_space, lo_space) = (
             gccontext.immix_space.as_ref().unwrap(),
             gccontext.lo_space.as_ref().unwrap(),
@@ -265,7 +314,7 @@ fn gc() {
 
     // sweep
     {
-        let mut gccontext = GC_CONTEXT.write().unwrap();
+        let mut gccontext = GC_CONTEXT.write();
         let immix_space = gccontext.immix_space.as_mut().unwrap();
 
         immix_space.sweep();
