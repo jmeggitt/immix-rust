@@ -1,3 +1,4 @@
+use std::alloc::Layout;
 use immix_rust::common::Address;
 use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
@@ -40,7 +41,7 @@ pub fn alloc_init() {
     );
     let mut objs = vec![];
     for _ in 0..INIT_TIMES {
-        let res = mutator.alloc(ACTUAL_OBJECT_SIZE, OBJECT_ALIGN);
+        let res = mutator.alloc(Layout::from_size_align(ACTUAL_OBJECT_SIZE, OBJECT_ALIGN).unwrap());
 
         objs.push(res);
     }

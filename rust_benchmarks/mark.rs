@@ -1,3 +1,4 @@
+use std::alloc::Layout;
 use immix_rust::common::ObjectReference;
 use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
@@ -40,7 +41,7 @@ pub fn alloc_mark() {
     );
     let mut objs = vec![];
     for _ in 0..MARK_TIMES {
-        let res = mutator.alloc(ACTUAL_OBJECT_SIZE, OBJECT_ALIGN);
+        let res = mutator.alloc(Layout::from_size_align(ACTUAL_OBJECT_SIZE, OBJECT_ALIGN).unwrap());
         mutator.init_object(res, 0b1100_0011);
 
         objs.push(unsafe { res.to_object_reference() });

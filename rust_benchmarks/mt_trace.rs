@@ -1,3 +1,4 @@
+use std::alloc::Layout;
 use immix_rust::common::Address;
 use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
@@ -13,7 +14,7 @@ pub const OBJECT_ALIGN: usize = 8;
 
 #[inline(always)]
 fn alloc_k_ary_tree(mutator: &mut ImmixMutatorLocal) -> Address {
-    let addr = mutator.alloc(OBJECT_SIZE, OBJECT_ALIGN);
+    let addr = mutator.alloc(Layout::from_size_align(OBJECT_SIZE, OBJECT_ALIGN).unwrap());
     mutator.init_object(addr, 0b1100_1111);
     addr
 }

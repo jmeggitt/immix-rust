@@ -1,6 +1,7 @@
 // TODO: Reduce the number of unsafe functions then remove this
 #![allow(clippy::missing_safety_doc)]
 
+use std::alloc::Layout;
 use lazy_static::lazy_static;
 use std::sync::atomic::Ordering;
 
@@ -85,7 +86,7 @@ pub extern "C" fn alloc(
     size: usize,
     align: usize,
 ) -> ObjectReference {
-    let addr = mutator.alloc(size, align);
+    let addr = mutator.alloc(Layout::from_size_align(size, align).unwrap());
     unsafe { addr.to_object_reference() }
 }
 
@@ -95,6 +96,6 @@ pub extern "C" fn alloc_slow(
     size: usize,
     align: usize,
 ) -> ObjectReference {
-    let ret = mutator.try_alloc_from_local(size, align);
+    let ret = mutator.try_alloc_from_local(Layout::from_size_align(size, align).unwrap());
     unsafe { ret.to_object_reference() }
 }

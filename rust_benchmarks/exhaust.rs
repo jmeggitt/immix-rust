@@ -1,3 +1,4 @@
+use std::alloc::Layout;
 use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
 use immix_rust::heap::immix::ImmixSpace;
@@ -46,7 +47,7 @@ fn alloc_loop(mutator: &mut ImmixMutatorLocal) {
     for _ in 0..ALLOCATION_TIMES {
         //        mutator.yieldpoint();
 
-        let res = mutator.alloc(OBJECT_SIZE, OBJECT_ALIGN);
+        let res = mutator.alloc(Layout::from_size_align(OBJECT_SIZE, OBJECT_ALIGN).unwrap());
         mutator.init_object(res, 0b1100_0011);
     }
 

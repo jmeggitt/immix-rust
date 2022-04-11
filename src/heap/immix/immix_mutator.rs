@@ -13,6 +13,7 @@ use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::*;
+use std::alloc::Layout;
 
 lazy_static! {
     pub static ref MUTATORS: RwLock<Arena<Arc<ImmixMutatorGlobal>>> = RwLock::new(Arena::with_capacity(1024));
@@ -117,15 +118,15 @@ impl ImmixMutatorLocal {
     }
 
     #[inline(always)]
-    pub fn alloc(&mut self, size: usize, align: usize) -> Address {
+    pub fn alloc(&mut self, layout: Layout) -> Address {
         // println!("Fastpath allocation");
-        let start = self.cursor.align_up(align);
-        let end = start.plus(size);
+        let start = self.cursor.align_up(layout.align());
+        let end = start.plus(layout.size());
 
         // println!("cursor = {:#X}, after align = {:#X}", c, start);
 
         if end > self.limit {
-            self.try_alloc_from_local(size, align)
+            self.try_alloc_from_local(layout)
         } else {
             //            fill_alignment_gap(self.cursor, start);
             self.cursor = end;
@@ -149,7 +150,7 @@ impl ImmixMutatorLocal {
     }
 
     #[inline(never)]
-    pub fn try_alloc_from_local(&mut self, size: usize, align: usize) -> Address {
+    pub fn try_alloc_from_local(&mut self, layout: Layout) -> Address {
         // println!("Trying to allocate from local");
 
         if self.line < immix::LINES_IN_BLOCK {
@@ -186,20 +187,20 @@ impl ImmixMutatorLocal {
                             .set(line, immix::LineMark::FreshAlloc);
                     }
 
-                    self.alloc(size, align)
+                    self.alloc(layout)
                 }
                 None => {
                     // println!("no available line in current block");
-                    self.alloc_from_global(size, align)
+                    self.alloc_from_global(layout)
                 }
             }
         } else {
             // we need to alloc from global space
-            self.alloc_from_global(size, align)
+            self.alloc_from_global(layout)
         }
     }
 
-    fn alloc_from_global(&mut self, size: usize, align: usize) -> Address {
+    fn alloc_from_global(&mut self, layout: Layout) -> Address {
         trace!("Mutator{:?}: slowpath: alloc_from_global", self.id);
 
         self.return_block();
@@ -217,7 +218,7 @@ impl ImmixMutatorLocal {
                     self.limit = self.block().start();
                     self.line = 0;
 
-                    return self.alloc(size, align);
+                    return self.alloc(layout);
                 }
                 None => {
                     continue;

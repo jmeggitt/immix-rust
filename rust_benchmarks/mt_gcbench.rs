@@ -3,6 +3,7 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
 
+use std::alloc::Layout;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
@@ -11,7 +12,6 @@ use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
 use immix_rust::heap::immix::ImmixSpace;
 use std::mem::size_of;
-use std::ptr::null_mut;
 
 const kStretchTreeDepth: usize = 18;
 const kLongLivedTreeDepth: usize = 16;
@@ -26,12 +26,6 @@ struct Node {
     right: *mut Node,
     _i: i32,
     _j: i32,
-}
-
-#[repr(C)] // Enforce field ordering
-struct Array {
-    _hdr: u64,
-    _value: [f64; kArraySize as usize],
 }
 
 fn init_Node(me: *mut Node, l: *mut Node, r: *mut Node) {
@@ -50,7 +44,7 @@ fn NumIters(i: usize) -> usize {
 }
 
 fn Populate(iDepth: usize, thisNode: *mut Node, mutator: &mut ImmixMutatorLocal) {
-    if iDepth <= 0 {
+    if iDepth == 0 {
         return;
     }
     unsafe {
@@ -62,7 +56,7 @@ fn Populate(iDepth: usize, thisNode: *mut Node, mutator: &mut ImmixMutatorLocal)
 }
 
 fn MakeTree(iDepth: usize, mutator: &mut ImmixMutatorLocal) -> *mut Node {
-    if iDepth <= 0 {
+    if iDepth == 0 {
         alloc(mutator)
     } else {
         let left = MakeTree(iDepth - 1, mutator);
@@ -116,13 +110,13 @@ fn run_one_test(immix_space: Arc<ImmixSpace>) {
         d += 2;
     }
 
-    drop(longLivedTree);
+    // drop(longLivedTree);
     mutator.destroy();
 }
 
 #[inline(always)]
 fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
-    let addr = mutator.alloc(size_of::<Node>(), 8);
+    let addr = mutator.alloc(Layout::new::<Node>());
     mutator.init_object(addr, 0b1100_0011);
     addr.to_ptr_mut::<Node>()
 }

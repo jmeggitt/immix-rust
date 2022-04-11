@@ -2,6 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
+use std::alloc::Layout;
 use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
 use immix_rust::heap::immix::ImmixSpace;
@@ -91,7 +92,7 @@ fn TimeConstruction(depth: i32, mutator: &mut ImmixMutatorLocal) {
 
 #[inline(always)]
 fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
-    let addr = mutator.alloc(size_of::<Node>(), 8);
+    let addr = mutator.alloc(Layout::new::<Node>());
     mutator.init_object(addr, 0b1100_0011);
     //    objectmodel::init_header(unsafe{addr.to_object_reference()}, HEADER_INIT_U64);
     addr.to_ptr_mut::<Node>()

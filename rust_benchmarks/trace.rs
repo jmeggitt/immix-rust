@@ -1,3 +1,4 @@
+use std::alloc::Layout;
 use immix_rust::common::Address;
 use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
@@ -38,12 +39,12 @@ pub fn alloc_trace() {
         TRACE_TIMES,
         TRACE_TIMES * ACTUAL_OBJECT_SIZE
     );
-    let root = mutator.alloc(ACTUAL_OBJECT_SIZE, OBJECT_ALIGN);
+    let root = mutator.alloc(Layout::from_size_align(ACTUAL_OBJECT_SIZE, OBJECT_ALIGN).unwrap());
     mutator.init_object(root, 0b1100_0001);
 
     let mut prev = root;
     for _ in 0..TRACE_TIMES - 1 {
-        let res = mutator.alloc(ACTUAL_OBJECT_SIZE, OBJECT_ALIGN);
+        let res = mutator.alloc(Layout::from_size_align(ACTUAL_OBJECT_SIZE, OBJECT_ALIGN).unwrap());
         mutator.init_object(res, 0b1100_0001);
 
         // set prev's 1st field (offset 0) to this object
