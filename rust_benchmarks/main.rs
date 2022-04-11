@@ -10,13 +10,8 @@ mod mt_trace;
 mod obj_init;
 mod trace;
 
-fn init() {
-    objectmodel::init();
-}
 
 fn main() {
-    init();
-
     match env::var("HEAP_SIZE") {
         Ok(val) => {
             if val.ends_with('M') {

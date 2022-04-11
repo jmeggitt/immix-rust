@@ -1,4 +1,4 @@
-use crate::heap::gc;
+use crate::heap::{gc, ImmixGC};
 use crate::heap::immix;
 use crate::heap::immix::immix_space::ImmixBlock;
 use crate::heap::immix::ImmixSpace;
@@ -10,9 +10,10 @@ use crate::common::LOG_POINTER_SIZE;
 
 use generational_arena::{Arena, Index};
 use parking_lot::RwLock;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::*;
+use crate::heap::gc::stack_scan;
 
 lazy_static! {
     pub static ref MUTATORS: RwLock<Arena<Arc<ImmixMutatorGlobal>>> = RwLock::new(Arena::with_capacity(1024));
@@ -38,20 +39,16 @@ pub struct ImmixMutatorLocal {
     line: usize,
 
     // globally accessible per-thread fields
-    pub global: Arc<ImmixMutatorGlobal>,
+    // pub global: Arc<ImmixMutatorGlobal>,
+    should_yield: Arc<AtomicBool>,
 
-    space: Arc<ImmixSpace>,
+    space: Arc<ImmixGC>,
     block: Option<Box<ImmixBlock>>,
 }
 
-#[derive(Default, Debug)]
-pub struct ImmixMutatorGlobal {
-    take_yield: AtomicBool,
-    still_blocked: AtomicBool,
-}
 
 impl ImmixMutatorLocal {
-    pub fn reset(&mut self) {
+    pub unsafe fn reset(&mut self) {
         unsafe {
             // should not use Address::zero() other than initialization
             self.cursor = Address::zero();
@@ -60,6 +57,17 @@ impl ImmixMutatorLocal {
         self.line = immix::LINES_IN_BLOCK;
 
         self.block = None;
+    }
+
+    fn create_id() -> u64 {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+        let ret = NEXT_ID.fetch_add(1, Ordering::SeqCst);
+
+        if ret == 0 {
+            panic!("ImmixMutatorLocal ID overflow")
+        }
+
+        ret
     }
 
     pub fn new(space: Arc<ImmixSpace>) -> ImmixMutatorLocal {
@@ -105,16 +113,34 @@ impl ImmixMutatorLocal {
 
     #[inline(always)]
     pub fn yieldpoint(&mut self) {
-        if self.global.take_yield() {
-            self.yieldpoint_slow();
+        if self.should_yield.load(Ordering::SeqCst) {
+            self.gc_barrier();
         }
+        // if self.global.take_yield() {
+        //     self.yieldpoint_slow();
+        // }
     }
 
     #[inline(never)]
-    pub fn yieldpoint_slow(&mut self) {
+    fn gc_barrier(&mut self) {
         trace!("Mutator{:?}: yieldpoint triggered, slow path", self.id);
-        gc::sync_barrier(self);
+
+        self.prepare_for_gc();
+        let thread_roots = stack_scan(&self.space);
+        self.space.append_roots(&thread_roots);
+
+        if self.space.claim_control_or_block() {
+            gc::gc(self.space.clone());
+        }
+
+        unsafe { self.reset() };
     }
+
+    // #[inline(never)]
+    // pub fn yieldpoint_slow(&mut self) {
+    //     trace!("Mutator{:?}: yieldpoint triggered, slow path", self.id);
+    //     gc::sync_barrier(self);
+    // }
 
     #[inline(always)]
     pub fn alloc(&mut self, size: usize, align: usize) -> Address {
@@ -259,6 +285,12 @@ impl ImmixMutatorLocal {
         println!("=========");
     }
 }
+
+// #[derive(Default, Debug)]
+// pub struct ImmixMutatorGlobal {
+//     take_yield: AtomicBool,
+//     still_blocked: AtomicBool,
+// }
 
 impl ImmixMutatorGlobal {
     pub fn new() -> ImmixMutatorGlobal {

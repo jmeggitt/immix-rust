@@ -56,9 +56,6 @@ pub extern "C" fn gc_init(
         heap::gc::GC_THREADS.store(n_gcthreads, Ordering::SeqCst);
         println!("{} gc threads", n_gcthreads);
     }
-
-    // init object model
-    objectmodel::init();
 }
 
 #[no_mangle]
@@ -80,11 +77,11 @@ pub extern "C" fn yieldpoint(mutator: &mut Box<ImmixMutatorLocal>) {
     mutator.yieldpoint();
 }
 
-#[no_mangle]
-#[inline(never)]
-pub extern "C" fn yieldpoint_slow(mutator: &mut Box<ImmixMutatorLocal>) {
-    mutator.yieldpoint_slow()
-}
+// #[no_mangle]
+// #[inline(never)]
+// pub extern "C" fn yieldpoint_slow(mutator: &mut Box<ImmixMutatorLocal>) {
+//     mutator.yieldpoint_slow()
+// }
 
 #[no_mangle]
 #[inline(always)]

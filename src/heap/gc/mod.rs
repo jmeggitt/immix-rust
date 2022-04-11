@@ -27,6 +27,7 @@ mod single_thread_trace;
 
 #[cfg(not(feature = "mt-trace"))]
 pub use single_thread_trace::start_trace;
+use crate::heap::ImmixGC;
 
 lazy_static! {
     static ref STW_COND: Arc<(Mutex<usize>, Condvar)> = Arc::new((Mutex::new(0), Condvar::new()));
@@ -34,7 +35,8 @@ lazy_static! {
 }
 
 static CONTROLLER: AtomicIsize = AtomicIsize::new(NO_CONTROLLER);
-const NO_CONTROLLER: isize = -1;
+// TODO: Move to be with ImmixGC
+pub const NO_CONTROLLER: isize = -1;
 
 pub fn trigger_gc() {
     trace!("Triggering GC...");
@@ -85,7 +87,7 @@ fn is_valid_object(addr: Address, start: Address, end: Address, live_map: &Addre
     common::test_nth_bit(live_map.get(addr), objectmodel::OBJ_START_BIT)
 }
 
-fn stack_scan(immix_space: &ImmixSpace) -> Vec<ObjectReference> {
+pub(crate) fn stack_scan(immix_space: &ImmixSpace) -> Vec<ObjectReference> {
     let stack_ptr: Address = Address::from_ptr(immmix_get_stack_ptr());
     let low_water_mark: Address = get_low_water_mark();
 
@@ -261,22 +263,24 @@ pub fn gc_count() -> usize {
     GC_COUNT.load(Ordering::SeqCst)
 }
 
-fn gc(immix_space: Arc<ImmixSpace>) {
+pub(crate) fn gc(immix_space: Arc<ImmixGC>) {
     GC_COUNT.fetch_add(1, Ordering::SeqCst);
 
     trace!("GC starts");
 
     // creates root deque
-    let roots: &mut Vec<ObjectReference> = &mut ROOTS.write();
+    // let roots: &mut Vec<ObjectReference> = &mut ROOTS.write();
+    let mut roots = immix_space.roots.lock();
 
     // mark & trace
-    start_trace(roots, immix_space.clone());
+    start_trace(&mut roots, immix_space.clone());
 
     trace!("trace done");
 
     // sweep
     immix_space.sweep();
 
-    objectmodel::flip_mark_state();
+    // objectmodel::flip_mark_state();
+    immix_space.flip_mark_state();
     trace!("GC finishes");
 }

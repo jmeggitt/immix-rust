@@ -22,8 +22,8 @@ pub fn start_trace(work_stack: &mut Vec<ObjectReference>, immix_space: Arc<Immix
     let worker = Worker::new_lifo();
     let stealer = worker.stealer();
 
-    while !work_stack.is_empty() {
-        worker.push(work_stack.pop().unwrap());
+    for reference in work_stack.drain(..) {
+        worker.push(reference);
     }
 
     loop {

@@ -9,9 +9,9 @@ name = "immix_rust"
 path = "src/lib.rs"
 crate-type = ["rlib", "dylib"]
 
-[[bin]]
-name = "benchmarks"
-path = "rust_benchmarks/main.rs"
+#[[bin]]
+#name = "benchmarks"
+#path = "rust_benchmarks/main.rs"
 
 [features]
 exhaust = []
