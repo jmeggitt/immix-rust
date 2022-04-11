@@ -3,7 +3,7 @@ use crate::heap::immix::ImmixLineMarkTable;
 use crate::{common, objectmodel, ImmixSpace, ObjectReference};
 #[cfg(feature = "mt-trace")]
 use crossbeam::deque::{Steal, Stealer, Worker};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 #[cfg(feature = "mt-trace")]
 use std::sync::mpsc;
 #[cfg(feature = "mt-trace")]

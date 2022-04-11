@@ -32,7 +32,6 @@ lazy_static! {
 pub extern "C" fn gc_init(
     immix_size: usize,
     lo_size: usize,
-    #[cfg(feature = "mt-trace")] n_gcthreads: usize,
 ) {
     // set this line to turn on certain level of debugging info
     //    simple_logger::init_with_level(log::LogLevel::Trace).ok();

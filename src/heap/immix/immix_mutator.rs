@@ -176,8 +176,9 @@ impl ImmixMutatorLocal {
                         .plus(end_line << immix::LOG_BYTES_IN_LINE);
                     self.line = end_line;
 
-                    // println!("{}", self);
-                    self.cursor.memset(0, self.limit.diff(self.cursor));
+                    unsafe {
+                        memsec::memset(self.cursor.to_ptr_mut(), 0, self.limit.diff(self.cursor));
+                    }
 
                     for line in next_available_line..end_line {
                         self.block()
@@ -188,7 +189,7 @@ impl ImmixMutatorLocal {
                     self.alloc(size, align)
                 }
                 None => {
-                    // println!("no availalbe line in current block");
+                    // println!("no available line in current block");
                     self.alloc_from_global(size, align)
                 }
             }

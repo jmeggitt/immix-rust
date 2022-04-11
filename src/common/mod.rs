@@ -54,16 +54,6 @@ impl Address {
         self.0 % align == 0
     }
 
-    pub fn memset(&self, char: u8, length: usize) {
-        let mut cur: *mut u8 = self.0 as *mut u8;
-        for _ in 0..length {
-            unsafe {
-                *cur = char;
-                cur = cur.offset(1);
-            }
-        }
-    }
-
     #[inline(always)]
     pub unsafe fn to_object_reference(&self) -> ObjectReference {
         mem::transmute(self.0)

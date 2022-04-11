@@ -13,6 +13,9 @@ crate-type = ["rlib", "dylib"]
 name = "benchmarks"
 path = "rust_benchmarks/main.rs"
 
+[profile.release]
+debug = true
+
 [features]
 exhaust = []
 initobj = []
@@ -30,7 +33,7 @@ simple_logger = "2.1.0"
 parking_lot = "0.12.0"
 generational-arena = "0.2.8"
 num_cpus = "1.13.1"
-
+memsec = "0.6.0"
 
 [dependencies.crossbeam]
 version = "0.8.1"

@@ -4,11 +4,11 @@ use crate::heap::gc;
 use crate::heap::immix;
 
 use crate::heap::immix::LineMark;
-use parking_lot::Mutex;
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::collections::LinkedList;
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::*;
+use crossbeam::deque::{Injector, Steal};
 
 // this table will be accessed through unsafe raw pointers. since Rust doesn't provide a data structure for such guarantees:
 // 1. Non-overlapping segments of this table may be accessed concurrently from different mutator threads
@@ -139,8 +139,8 @@ pub struct ImmixSpace {
     total_blocks: usize, // for debug use
 
     mmap: memmap::Mmap,
-    usable_blocks: Mutex<LinkedList<Box<ImmixBlock>>>,
-    used_blocks: Mutex<LinkedList<Box<ImmixBlock>>>,
+    usable_blocks: Injector<Box<ImmixBlock>>,
+    used_blocks: Injector<Box<ImmixBlock>>,
 }
 
 pub struct ImmixBlock {
@@ -177,8 +177,8 @@ impl ImmixSpace {
             line_mark_table,
             trace_map: Arc::new(AddressMap::new(start, end)),
             alloc_map: Arc::new(AddressMap::new(start, end)),
-            usable_blocks: Mutex::new(LinkedList::new()),
-            used_blocks: Mutex::new(LinkedList::new()),
+            usable_blocks: Injector::new(),
+            used_blocks: Injector::new(),
             total_blocks: 0,
         };
 
@@ -192,10 +192,9 @@ impl ImmixSpace {
         let mut block_start = self.start;
         let mut line = 0;
 
-        let mut usable_blocks_lock = self.usable_blocks.lock();
 
         while block_start.plus(immix::BYTES_IN_BLOCK) <= self.end {
-            usable_blocks_lock.push_back(Box::new(ImmixBlock {
+            self.usable_blocks.push(Box::new(ImmixBlock {
                 id,
                 state: immix::BlockMark::Usable,
                 start: block_start,
@@ -215,18 +214,19 @@ impl ImmixSpace {
         // This avoids explicit ownership transferring
         // If we explicitly transfer ownership, the function needs to own the Mutator in order to move the ImmixBlock out of it (see ImmixMutatorLocal.alloc_from_global()),
         // and this will result in passing the Mutator object as value (instead of a borrowed reference) all the way in the allocation
-        self.used_blocks.lock().push_front(old);
+        self.used_blocks.push(old);
     }
 
     pub fn get_next_usable_block(&self) -> Option<Box<ImmixBlock>> {
-        let res_new_block: Option<Box<ImmixBlock>> = { self.usable_blocks.lock().pop_front() };
-        if res_new_block.is_none() {
-            // should unlock, and call GC here
-            gc::trigger_gc();
-
-            None
-        } else {
-            res_new_block
+        loop {
+            match self.usable_blocks.steal() {
+                Steal::Empty => {
+                    gc::trigger_gc();
+                    return None
+                },
+                Steal::Success(v) => return Some(v),
+                Steal::Retry => {},
+            }
         }
     }
 
@@ -235,13 +235,18 @@ impl ImmixSpace {
         let mut usable_blocks = 0;
         let mut full_blocks = 0;
 
-        let mut used_blocks_lock = self.used_blocks.lock();
-        let mut usable_blocks_lock = self.usable_blocks.lock();
+        // let mut used_blocks_lock = self.used_blocks.lock();
+        // let mut usable_blocks_lock = self.usable_blocks.lock();
 
-        let mut live_blocks: LinkedList<Box<ImmixBlock>> = LinkedList::new();
+        let mut live_blocks: VecDeque<Box<ImmixBlock>> = VecDeque::with_capacity(self.used_blocks.len());
 
-        while !used_blocks_lock.is_empty() {
-            let mut block = used_blocks_lock.pop_front().unwrap();
+        loop {
+            // let mut block = used_blocks_lock.pop_front().unwrap();
+            let mut block = match self.used_blocks.steal() {
+                Steal::Empty => break,
+                Steal::Success(v) => v,
+                Steal::Retry => continue,
+            };
 
             let mut has_free_lines = false;
 
@@ -265,7 +270,8 @@ impl ImmixSpace {
                 block.set_state(immix::BlockMark::Usable);
                 usable_blocks += 1;
 
-                usable_blocks_lock.push_front(block);
+                // usable_blocks_lock.push_front(block);
+                self.usable_blocks.push(block);
             } else {
                 block.set_state(immix::BlockMark::Full);
                 full_blocks += 1;
@@ -273,7 +279,10 @@ impl ImmixSpace {
             }
         }
 
-        used_blocks_lock.append(&mut live_blocks);
+        // used_blocks_lock.append(&mut live_blocks);
+        for block in live_blocks {
+            self.used_blocks.push(block);
+        }
 
         if cfg!(debug_assertions) {
             println!(
@@ -286,8 +295,7 @@ impl ImmixSpace {
         }
 
         if full_blocks == self.total_blocks {
-            println!("Out of memory in Immix Space");
-            std::process::exit(1);
+            panic!("Out of memory in Immix Space");
         }
 
         debug_assert!(full_blocks + usable_blocks == self.total_blocks);
