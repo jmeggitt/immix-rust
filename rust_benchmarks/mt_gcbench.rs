@@ -11,12 +11,13 @@ use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
 use immix_rust::heap::immix::ImmixSpace;
 use std::mem::size_of;
+use std::ptr::null_mut;
 
-const kStretchTreeDepth: i32 = 18;
-const kLongLivedTreeDepth: i32 = 16;
-const kArraySize: i32 = 500000;
-const kMinTreeDepth: i32 = 4;
-const kMaxTreeDepth: i32 = 16;
+const kStretchTreeDepth: usize = 18;
+const kLongLivedTreeDepth: usize = 16;
+const kArraySize: usize = 500000;
+const kMinTreeDepth: usize = 4;
+const kMaxTreeDepth: usize = 21;
 
 #[repr(C)] // Enforce field ordering
 struct Node {
@@ -40,15 +41,15 @@ fn init_Node(me: *mut Node, l: *mut Node, r: *mut Node) {
     }
 }
 
-fn TreeSize(i: i32) -> i32 {
+fn TreeSize(i: usize) -> usize {
     (1 << (i + 1)) - 1
 }
 
-fn NumIters(i: i32) -> i32 {
-    2 * TreeSize(kStretchTreeDepth) / TreeSize(i)
+fn NumIters(i: usize) -> usize {
+    20 * TreeSize(kMaxTreeDepth) / TreeSize(i)
 }
 
-fn Populate(iDepth: i32, thisNode: *mut Node, mutator: &mut ImmixMutatorLocal) {
+fn Populate(iDepth: usize, thisNode: *mut Node, mutator: &mut ImmixMutatorLocal) {
     if iDepth <= 0 {
         return;
     }
@@ -60,7 +61,7 @@ fn Populate(iDepth: i32, thisNode: *mut Node, mutator: &mut ImmixMutatorLocal) {
     }
 }
 
-fn MakeTree(iDepth: i32, mutator: &mut ImmixMutatorLocal) -> *mut Node {
+fn MakeTree(iDepth: usize, mutator: &mut ImmixMutatorLocal) -> *mut Node {
     if iDepth <= 0 {
         alloc(mutator)
     } else {
@@ -75,7 +76,7 @@ fn MakeTree(iDepth: i32, mutator: &mut ImmixMutatorLocal) -> *mut Node {
 
 fn PrintDiagnostics() {}
 
-fn TimeConstruction(depth: i32, mutator: &mut ImmixMutatorLocal) {
+fn TimeConstruction(depth: usize, mutator: &mut ImmixMutatorLocal) {
     let iNumIters = NumIters(depth);
     println!("creating {} trees of depth {}", iNumIters, depth);
 
@@ -101,12 +102,21 @@ fn run_one_test(immix_space: Arc<ImmixSpace>) {
     heap::gc::set_low_water_mark();
     let mut mutator = ImmixMutatorLocal::new(immix_space);
 
+
+    println!(
+        " Creating a long-lived binary tree of depth {}",
+        kLongLivedTreeDepth
+    );
+    let longLivedTree = alloc(&mut mutator);
+    Populate(kLongLivedTreeDepth, longLivedTree, &mut mutator);
+
     let mut d = kMinTreeDepth;
     while d <= kMaxTreeDepth {
         TimeConstruction(d, &mut mutator);
         d += 2;
     }
 
+    drop(longLivedTree);
     mutator.destroy();
 }
 
@@ -117,33 +127,29 @@ fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
     addr.to_ptr_mut::<Node>()
 }
 
-use std::env;
 use std::time::Instant;
 
 pub fn start() {
     heap::gc::set_low_water_mark();
 
-    let n_threads: i32 = {
-        let args: Vec<_> = env::args().collect();
-        if args.len() > 1 {
-            args[1].parse().unwrap()
-        } else {
-            8
-        }
-    };
+    let n_threads: usize = num_cpus::get();
 
     let immix_space: Arc<ImmixSpace> = {
         let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
         Arc::new(space)
     };
 
-    let mut mutator = ImmixMutatorLocal::new(immix_space.clone());
+    // let mut mutator = ImmixMutatorLocal::new(immix_space.clone());
 
+
+    let peak_capacity = size_of::<Node>() * n_threads * TreeSize(kLongLivedTreeDepth)
+        + size_of::<Node>() * n_threads * TreeSize(kMaxTreeDepth);
     println!("Garbage Collector Test");
     println!(
-        " Live storage will peak at {} bytes.\n",
-        2 * (size_of::<Node>() as i32) * n_threads * TreeSize(kLongLivedTreeDepth)
-            + (size_of::<Array>() as i32)
+        " Live storage will peak at {} bytes ({} MB).\n",
+            peak_capacity,
+            peak_capacity >> 20
+            // + (size_of::<Array>() as i32)
     );
 
     println!(
@@ -155,15 +161,9 @@ pub fn start() {
     let time_start = Instant::now();
 
     // Stretch the memory space quickly
-    let tempTree = MakeTree(kStretchTreeDepth, &mut mutator);
+    // let tempTree = MakeTree(kStretchTreeDepth, &mut mutator);
     // destroy tree
 
-    println!(
-        " Creating a long-lived binary tree of depth {}",
-        kLongLivedTreeDepth
-    );
-    let longLivedTree = alloc(&mut mutator);
-    Populate(kLongLivedTreeDepth, longLivedTree, &mut mutator);
 
     println!(" Creating a long-lived array of {} doubles", kArraySize);
     // TODO: mutator.alloc(size_of::<Array>(), 8);
@@ -178,21 +178,21 @@ pub fn start() {
     }
 
     // run one test locally
-    let mut d = kMinTreeDepth;
-    while d <= kMaxTreeDepth {
-        TimeConstruction(d, &mut mutator);
-        d += 2;
-    }
+    // let mut d = kMinTreeDepth;
+    // while d <= kMaxTreeDepth {
+    //     TimeConstruction(d, &mut mutator);
+    //     d += 2;
+    // }
 
-    mutator.destroy();
+    // mutator.destroy();
 
     for t in threads {
         t.join().unwrap();
     }
 
-    if longLivedTree.is_null() {
-        println!("Failed(long lived tree wrong)");
-    }
+    // if longLivedTree.is_null() {
+    //     println!("Failed(long lived tree wrong)");
+    // }
 
     let elapsed = time_start.elapsed();
 

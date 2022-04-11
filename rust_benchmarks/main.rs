@@ -1,5 +1,6 @@
 use immix_rust::{heap, objectmodel};
 use std::env;
+use std::mem::size_of;
 use std::sync::atomic::Ordering;
 
 mod exhaust;
@@ -39,12 +40,17 @@ fn main() {
             }
         }
         Err(_) => {
+            let heap_size =  heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst);
             println!(
-                "using default heap size: {} bytes. ",
-                heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst)
+                "using default heap size: {} bytes ({} MB). ",
+                heap_size,
+                heap_size >> 20
             );
         }
     }
+
+    println!("The current machine has {} cpus!", num_cpus::get());
+    println!("Program compiled in {}x mode!", 8 * size_of::<*mut ()>());
 
     if cfg!(feature = "exhaust") {
         exhaust::exhaust_alloc();
