@@ -50,13 +50,6 @@ pub extern "C" fn gc_init(
         lo_size
     );
 
-    // gc threads
-    #[cfg(feature = "mt-trace")]
-    {
-        heap::gc::GC_THREADS.store(n_gcthreads, Ordering::SeqCst);
-        println!("{} gc threads", n_gcthreads);
-    }
-
     // init object model
     objectmodel::init();
 }

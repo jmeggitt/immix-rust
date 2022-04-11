@@ -20,7 +20,7 @@ use std::sync::Arc;
 mod multi_thread_trace;
 
 #[cfg(feature = "mt-trace")]
-pub use multi_thread_trace::{start_trace, GC_THREADS};
+pub use multi_thread_trace::start_trace;
 
 #[cfg(not(feature = "mt-trace"))]
 mod single_thread_trace;

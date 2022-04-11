@@ -46,16 +46,6 @@ fn main() {
         }
     }
 
-    #[cfg(feature = "mt-trace")]
-    match env::var("N_GCTHREADS") {
-        Ok(val) => {
-            heap::gc::GC_THREADS.store(val.parse::<usize>().unwrap(), Ordering::SeqCst);
-        }
-        Err(_) => {
-            heap::gc::GC_THREADS.store(8, Ordering::SeqCst);
-        }
-    }
-
     if cfg!(feature = "exhaust") {
         exhaust::exhaust_alloc();
     } else if cfg!(feature = "initobj") {

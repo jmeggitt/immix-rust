@@ -13,7 +13,6 @@ use std::sync::Arc;
 use std::thread;
 
 const PUSH_BACK_THRESHOLD: usize = 50;
-pub static GC_THREADS: AtomicUsize = AtomicUsize::new(0);
 
 #[inline(never)]
 #[cfg(feature = "mt-trace")]
@@ -30,7 +29,7 @@ pub fn start_trace(work_stack: &mut Vec<ObjectReference>, immix_space: Arc<Immix
         let (sender, receiver) = channel::<ObjectReference>();
 
         let mut gc_threads = vec![];
-        for _ in 0..GC_THREADS.load(Ordering::SeqCst) {
+        for _ in 0..num_cpus::get() {
             let new_immix_space = immix_space.clone();
             let new_stealer = stealer.clone();
             let new_sender = sender.clone();

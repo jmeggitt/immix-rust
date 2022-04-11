@@ -29,6 +29,8 @@ log = "0.4.16"
 simple_logger = "2.1.0"
 parking_lot = "0.12.0"
 generational-arena = "0.2.8"
+num_cpus = "1.13.1"
+
 
 [dependencies.crossbeam]
 version = "0.8.1"
