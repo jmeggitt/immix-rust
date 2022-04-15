@@ -1,9 +1,11 @@
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::mem::size_of;
+use std::ops::{Index, IndexMut};
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use crate::common::Address;
 use crate::common::LOG_POINTER_SIZE;
 
-#[derive(Clone)]
 pub struct AddressMap<T> {
     start: Address,
     end: Address,
@@ -51,5 +53,87 @@ impl<T> Drop for AddressMap<T> {
         unsafe {
             System.dealloc(self.ptr as *mut u8, self.layout);
         }
+    }
+}
+
+pub struct SafeAddressMap<T> {
+    offset: usize,
+    addresses: Vec<T>,
+}
+
+impl<T> SafeAddressMap<T> {
+    pub fn new_of<F: FnMut() -> T>(start: usize, end: usize, f: F) -> Self {
+        let ptr_size = size_of::<*mut ()>();
+        let len = ((end - start) + ptr_size - 1) / ptr_size;
+
+        let mut addresses = Vec::with_capacity(len);
+        addresses.resize_with(len, f);
+
+        SafeAddressMap {
+            offset: start,
+            addresses,
+        }
+    }
+
+    #[inline(always)]
+    pub fn get(&self, index: usize) -> Option<&T> {
+        let normalized_index = index.overflowing_sub(self.offset).0 / size_of::<*mut ()>();
+        self.addresses.get(normalized_index)
+    }
+}
+
+impl<T: Default> SafeAddressMap<T> {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self::new_of(start, end, T::default)
+    }
+}
+
+impl<T> Index<usize> for SafeAddressMap<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.addresses[(index - self.offset) / size_of::<*mut ()>()]
+    }
+}
+
+impl<T> IndexMut<usize> for SafeAddressMap<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.addresses[(index - self.offset) / size_of::<*mut ()>()]
+    }
+}
+
+pub struct TraceMap {
+    map: SafeAddressMap<AtomicU8>,
+    mark_state: u8,
+}
+
+impl TraceMap {
+    pub fn new(start: usize, end: usize) -> Self {
+        TraceMap {
+            map: SafeAddressMap::new(start, end),
+            mark_state: 0,
+        }
+    }
+
+    pub fn flip_mark_state(&mut self) {
+        self.mark_state ^= 1;
+    }
+
+    #[inline(always)]
+    pub fn is_traced<T>(&self, ptr: *const T) -> bool {
+        self.map[ptr as usize].load(Ordering::Relaxed) == self.mark_state
+    }
+
+    #[inline(always)]
+    pub fn is_untraced_and_valid<T>(&self, ptr: *const T) -> bool {
+        match self.map.get(ptr as usize) {
+            Some(v) => v.load(Ordering::Relaxed) != self.mark_state,
+            None => false,
+        }
+    }
+
+    #[inline(always)]
+    pub fn mark_as_traced<T>(&self, ptr: *const T) {
+        self.map[ptr as usize].store(self.mark_state, Ordering::Relaxed)
     }
 }

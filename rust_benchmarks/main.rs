@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 
 mod exhaust;
 mod gcbench;
-mod mark;
+// mod mark;
 mod mt_gcbench;
 mod mt_trace;
 mod obj_init;
@@ -40,7 +40,7 @@ fn main() {
             }
         }
         Err(_) => {
-            let heap_size =  heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst);
+            let heap_size = heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst);
             println!(
                 "using default heap size: {} bytes ({} MB). ",
                 heap_size,
@@ -61,7 +61,7 @@ fn main() {
     } else if cfg!(feature = "mt-gcbench") {
         mt_gcbench::start();
     } else if cfg!(feature = "mark") {
-        mark::alloc_mark();
+        // mark::alloc_mark();
     } else if cfg!(feature = "trace") {
         trace::alloc_trace();
     } else if cfg!(feature = "mt-trace") {

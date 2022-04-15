@@ -1,8 +1,8 @@
-use std::alloc::Layout;
 use immix_rust::common::Address;
 use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
 use immix_rust::heap::immix::ImmixSpace;
+use std::alloc::Layout;
 use std::time::Instant;
 
 pub const K: usize = 4;

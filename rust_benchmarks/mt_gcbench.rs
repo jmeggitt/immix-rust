@@ -96,7 +96,6 @@ fn run_one_test(immix_space: Arc<ImmixSpace>) {
     heap::gc::set_low_water_mark();
     let mut mutator = ImmixMutatorLocal::new(immix_space);
 
-
     println!(
         " Creating a long-lived binary tree of depth {}",
         kLongLivedTreeDepth
@@ -135,15 +134,13 @@ pub fn start() {
 
     // let mut mutator = ImmixMutatorLocal::new(immix_space.clone());
 
-
     let peak_capacity = size_of::<Node>() * n_threads * TreeSize(kLongLivedTreeDepth)
         + size_of::<Node>() * n_threads * TreeSize(kMaxTreeDepth);
     println!("Garbage Collector Test");
     println!(
         " Live storage will peak at {} bytes ({} MB).\n",
-            peak_capacity,
-            peak_capacity >> 20
-            // + (size_of::<Array>() as i32)
+        peak_capacity,
+        peak_capacity >> 20 // + (size_of::<Array>() as i32)
     );
 
     println!(
@@ -157,7 +154,6 @@ pub fn start() {
     // Stretch the memory space quickly
     // let tempTree = MakeTree(kStretchTreeDepth, &mut mutator);
     // destroy tree
-
 
     println!(" Creating a long-lived array of {} doubles", kArraySize);
     // TODO: mutator.alloc(size_of::<Array>(), 8);

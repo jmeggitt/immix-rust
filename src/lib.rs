@@ -1,8 +1,8 @@
 // TODO: Reduce the number of unsafe functions then remove this
 #![allow(clippy::missing_safety_doc)]
 
-use std::alloc::Layout;
 use lazy_static::lazy_static;
+use std::alloc::Layout;
 use std::sync::atomic::Ordering;
 
 pub mod common;
@@ -30,10 +30,7 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub extern "C" fn gc_init(
-    immix_size: usize,
-    lo_size: usize,
-) {
+pub extern "C" fn gc_init(immix_size: usize, lo_size: usize) {
     // set this line to turn on certain level of debugging info
     //    simple_logger::init_with_level(log::LogLevel::Trace).ok();
 

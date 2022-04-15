@@ -2,10 +2,10 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use std::alloc::Layout;
 use immix_rust::heap;
 use immix_rust::heap::immix::ImmixMutatorLocal;
 use immix_rust::heap::immix::ImmixSpace;
+use std::alloc::Layout;
 use std::mem::size_of;
 use std::time::Instant;
 

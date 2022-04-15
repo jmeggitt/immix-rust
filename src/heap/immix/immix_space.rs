@@ -1,14 +1,13 @@
-use crate::common::Address;
 use crate::common::AddressMap;
+use crate::common::{Address, TraceMap};
 use crate::heap::gc;
 use crate::heap::immix;
 
 use crate::heap::immix::LineMark;
+use crossbeam::deque::{Injector, Steal};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::VecDeque;
-use std::sync::Arc;
 use std::*;
-use crossbeam::deque::{Injector, Steal};
 
 // this table will be accessed through unsafe raw pointers. since Rust doesn't provide a data structure for such guarantees:
 // 1. Non-overlapping segments of this table may be accessed concurrently from different mutator threads
@@ -125,14 +124,15 @@ pub struct ImmixSpace {
     start: Address,
     end: Address,
 
+    // TODO: Make SafeAddressMap<u8> atomic (SafeAddressMap<AtomicU8>)
     // these maps are writable at allocation, read-only at collection
-    pub alloc_map: Arc<AddressMap<u8>>,
+    pub alloc_map: AddressMap<u8>,
 
     // these maps are only for collection
-    pub trace_map: Arc<AddressMap<u8>>,
+    pub trace_map: TraceMap,
 
     // this table will be accessed through unsafe raw pointers. since Rust doesn't provide a data structure for such guarantees:
-    // 1. Non-overlapping segments of this table may be accessed parallelly from different mutator threads
+    // 1. Non-overlapping segments of this table may be accessed concurrently from different mutator threads
     // 2. One element may be written into at the same time by different gc threads during tracing
     pub line_mark_table: LineMarkTable,
 
@@ -175,8 +175,8 @@ impl ImmixSpace {
             mmap: anon_mmap,
 
             line_mark_table,
-            trace_map: Arc::new(AddressMap::new(start, end)),
-            alloc_map: Arc::new(AddressMap::new(start, end)),
+            trace_map: TraceMap::new(start.as_usize(), end.as_usize()),
+            alloc_map: AddressMap::new(start, end),
             usable_blocks: Injector::new(),
             used_blocks: Injector::new(),
             total_blocks: 0,
@@ -191,7 +191,6 @@ impl ImmixSpace {
         let mut id = 0;
         let mut block_start = self.start;
         let mut line = 0;
-
 
         while block_start.plus(immix::BYTES_IN_BLOCK) <= self.end {
             self.usable_blocks.push(Box::new(ImmixBlock {
@@ -222,10 +221,10 @@ impl ImmixSpace {
             match self.usable_blocks.steal() {
                 Steal::Empty => {
                     gc::trigger_gc();
-                    return None
-                },
+                    return None;
+                }
                 Steal::Success(v) => return Some(v),
-                Steal::Retry => {},
+                Steal::Retry => {}
             }
         }
     }
@@ -238,7 +237,8 @@ impl ImmixSpace {
         // let mut used_blocks_lock = self.used_blocks.lock();
         // let mut usable_blocks_lock = self.usable_blocks.lock();
 
-        let mut live_blocks: VecDeque<Box<ImmixBlock>> = VecDeque::with_capacity(self.used_blocks.len());
+        let mut live_blocks: VecDeque<Box<ImmixBlock>> =
+            VecDeque::with_capacity(self.used_blocks.len());
 
         loop {
             // let mut block = used_blocks_lock.pop_front().unwrap();

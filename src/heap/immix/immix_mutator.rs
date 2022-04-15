@@ -10,10 +10,10 @@ use crate::common::LOG_POINTER_SIZE;
 
 use generational_arena::{Arena, Index};
 use parking_lot::RwLock;
+use std::alloc::Layout;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::*;
-use std::alloc::Layout;
 
 lazy_static! {
     pub static ref MUTATORS: RwLock<Arena<Arc<ImmixMutatorGlobal>>> = RwLock::new(Arena::with_capacity(1024));

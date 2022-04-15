@@ -2,7 +2,7 @@ use std::fmt;
 use std::mem;
 
 mod address_map;
-pub use self::address_map::AddressMap;
+pub use self::address_map::{AddressMap, SafeAddressMap, TraceMap};
 
 pub const LOG_POINTER_SIZE: usize = 3;
 pub const POINTER_SIZE: usize = 1 << LOG_POINTER_SIZE;
