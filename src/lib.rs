@@ -48,7 +48,7 @@ pub extern "C" fn gc_init(immix_size: usize, lo_size: usize) {
     );
 
     // init object model
-    objectmodel::init();
+    // objectmodel::init();
 }
 
 #[no_mangle]

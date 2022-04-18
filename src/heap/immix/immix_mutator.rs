@@ -111,7 +111,7 @@ impl ImmixMutatorLocal {
         }
     }
 
-    #[inline(never)]
+    #[cold]
     pub fn yieldpoint_slow(&mut self) {
         trace!("Mutator{:?}: yieldpoint triggered, slow path", self.id);
         gc::sync_barrier(self);
@@ -119,19 +119,14 @@ impl ImmixMutatorLocal {
 
     #[inline(always)]
     pub fn alloc(&mut self, layout: Layout) -> Address {
-        // println!("Fastpath allocation");
         let start = self.cursor.align_up(layout.align());
         let end = start.plus(layout.size());
 
-        // println!("cursor = {:#X}, after align = {:#X}", c, start);
-
-        if end > self.limit {
-            self.try_alloc_from_local(layout)
-        } else {
-            //            fill_alignment_gap(self.cursor, start);
+        if end <= self.limit {
             self.cursor = end;
-
             start
+        } else {
+            self.try_alloc_from_local(layout)
         }
     }
 
@@ -149,7 +144,7 @@ impl ImmixMutatorLocal {
         self.init_object(addr, encode);
     }
 
-    #[inline(never)]
+    #[cold]
     pub fn try_alloc_from_local(&mut self, layout: Layout) -> Address {
         // println!("Trying to allocate from local");
 
@@ -177,9 +172,9 @@ impl ImmixMutatorLocal {
                         .plus(end_line << immix::LOG_BYTES_IN_LINE);
                     self.line = end_line;
 
-                    unsafe {
-                        memsec::memset(self.cursor.to_ptr_mut(), 0, self.limit.diff(self.cursor));
-                    }
+                    // unsafe {
+                    //     memsec::memset(self.cursor.to_ptr_mut(), 0, self.limit.diff(self.cursor));
+                    // }
 
                     for line in next_available_line..end_line {
                         self.block()

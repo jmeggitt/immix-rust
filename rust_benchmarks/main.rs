@@ -11,12 +11,7 @@ mod mt_trace;
 mod obj_init;
 mod trace;
 
-fn init() {
-    objectmodel::init();
-}
-
 fn main() {
-    init();
 
     match env::var("HEAP_SIZE") {
         Ok(val) => {
@@ -32,7 +27,7 @@ fn main() {
                     heap_size, immix_space_size
                 );
             } else {
-                println!("unknow heap size variable: {}, ignore", val);
+                println!("unknown heap size variable: {}, ignore", val);
                 println!(
                     "using default heap size: {} bytes. ",
                     heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst)
