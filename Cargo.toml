@@ -13,6 +13,7 @@ crate-type = ["rlib", "dylib"]
 name = "benchmarks"
 path = "rust_benchmarks/main.rs"
 
+# Add debug information to release build to make it easier to look for hotspots with VTune
 [profile.release]
 debug = true
 
@@ -38,3 +39,11 @@ memsec = "0.6.0"
 [dependencies.crossbeam]
 version = "0.8.1"
 optional = true
+
+[dev-dependencies]
+criterion = "0.3.5"
+
+[[bench]]
+name = "large_alloc"
+harness = false
+required-features = ["mt-trace"]

@@ -68,8 +68,6 @@ fn MakeTree(iDepth: usize, mutator: &mut ImmixMutatorLocal) -> *mut Node {
     }
 }
 
-fn PrintDiagnostics() {}
-
 fn TimeConstruction(depth: usize, mutator: &mut ImmixMutatorLocal) {
     let iNumIters = NumIters(depth);
     println!("creating {} trees of depth {}", iNumIters, depth);
@@ -147,7 +145,6 @@ pub fn start() {
         " Stretching memory with a binary tree or depth {}",
         kStretchTreeDepth
     );
-    PrintDiagnostics();
 
     let time_start = Instant::now();
 
@@ -186,7 +183,6 @@ pub fn start() {
 
     let elapsed = time_start.elapsed();
 
-    PrintDiagnostics();
     println!("Completed in {:?}", elapsed);
     println!("Finished with {} collections", heap::gc::gc_count());
 }
