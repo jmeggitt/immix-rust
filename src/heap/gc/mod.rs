@@ -16,17 +16,8 @@ use parking_lot::{Condvar, Mutex, RwLock};
 use std::sync::atomic::{AtomicIsize, AtomicPtr, AtomicUsize, Ordering};
 use std::sync::Arc;
 
-#[cfg(feature = "mt-trace")]
 mod multi_thread_trace;
-
-#[cfg(feature = "mt-trace")]
 pub use multi_thread_trace::start_trace;
-
-#[cfg(not(feature = "mt-trace"))]
-mod single_thread_trace;
-
-#[cfg(not(feature = "mt-trace"))]
-pub use single_thread_trace::start_trace;
 
 lazy_static! {
     static ref STW_COND: Arc<(Mutex<usize>, Condvar)> = Arc::new((Mutex::new(0), Condvar::new()));
