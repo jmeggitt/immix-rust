@@ -7,7 +7,7 @@ use std::arch::asm;
 use std::ptr::null_mut;
 
 use crate::common;
-use crate::common::{AddressMap, TraceMap};
+use crate::common::AddressMap;
 use crate::common::{Address, ObjectReference};
 
 use lazy_static::lazy_static;
@@ -268,10 +268,6 @@ fn gc(immix_space: Arc<ImmixSpace>) {
     // sweep
     immix_space.sweep();
 
-    // TODO: Fix this to use proper safety
-    unsafe {
-        let trace_map = &mut *(&immix_space.trace_map as *const TraceMap as *mut TraceMap);
-        trace_map.flip_mark_state();
-    }
+    immix_space.trace_map.flip_mark_state();
     trace!("GC finishes");
 }

@@ -1,4 +1,5 @@
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::cell::Cell;
 use std::mem::size_of;
 use std::ops::{Index, IndexMut};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -104,36 +105,36 @@ impl<T> IndexMut<usize> for SafeAddressMap<T> {
 
 pub struct TraceMap {
     map: SafeAddressMap<AtomicU8>,
-    mark_state: u8,
+    mark_state: Cell<u8>,
 }
 
 impl TraceMap {
     pub fn new(start: usize, end: usize) -> Self {
         TraceMap {
             map: SafeAddressMap::new(start, end),
-            mark_state: 0,
+            mark_state: Cell::new(0),
         }
     }
 
-    pub fn flip_mark_state(&mut self) {
-        self.mark_state ^= 1;
+    pub fn flip_mark_state(&self) {
+        self.mark_state.set(self.mark_state.get() ^ 1);
     }
 
     #[inline(always)]
     pub fn is_traced<T>(&self, ptr: *const T) -> bool {
-        self.map[ptr as usize].load(Ordering::Relaxed) == self.mark_state
+        self.map[ptr as usize].load(Ordering::Relaxed) == self.mark_state.get()
     }
 
     #[inline(always)]
     pub fn is_untraced_and_valid<T>(&self, ptr: *const T) -> bool {
         match self.map.get(ptr as usize) {
-            Some(v) => v.load(Ordering::Relaxed) != self.mark_state,
+            Some(v) => v.load(Ordering::Relaxed) != self.mark_state.get(),
             None => false,
         }
     }
 
     #[inline(always)]
     pub fn mark_as_traced<T>(&self, ptr: *const T) {
-        self.map[ptr as usize].store(self.mark_state, Ordering::Relaxed)
+        self.map[ptr as usize].store(self.mark_state.get(), Ordering::Relaxed)
     }
 }
