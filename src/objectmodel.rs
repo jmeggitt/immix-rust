@@ -1,4 +1,3 @@
-use std::sync::atomic;
 use crate::common::ObjectReference;
 
 use crate::common::Address;

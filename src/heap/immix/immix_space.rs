@@ -8,6 +8,7 @@ use crossbeam::deque::{Injector, Steal};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::VecDeque;
 use std::*;
+use memmap2::{MmapMut, MmapOptions};
 
 // this table will be accessed through unsafe raw pointers. since Rust doesn't provide a data structure for such guarantees:
 // 1. Non-overlapping segments of this table may be accessed concurrently from different mutator threads
@@ -138,7 +139,7 @@ pub struct ImmixSpace {
 
     total_blocks: usize, // for debug use
 
-    mmap: memmap::Mmap,
+    mmap: MmapMut,
     usable_blocks: Injector<Box<ImmixBlock>>,
     used_blocks: Injector<Box<ImmixBlock>>,
 }
@@ -156,15 +157,12 @@ const SPACE_ALIGN: usize = 1 << 19;
 
 impl ImmixSpace {
     pub fn new(space_size: usize) -> ImmixSpace {
-        // acquire memory through mmap
-        let anon_mmap: memmap::Mmap = match memmap::Mmap::anonymous(
-            space_size + SPACE_ALIGN,
-            memmap::Protection::ReadWrite,
-        ) {
-            Ok(m) => m,
-            Err(_) => panic!("failed to call mmap"),
-        };
-        let start: Address = Address::from_ptr::<u8>(anon_mmap.ptr()).align_up(SPACE_ALIGN);
+        // Acquire memory through mmap
+        let mut anon_mmap = MmapOptions::new()
+            .len(space_size + SPACE_ALIGN)
+            .map_anon()
+            .expect("failed to call mmap");
+        let start: Address = Address::from_ptr::<u8>(anon_mmap.as_mut_ptr()).align_up(SPACE_ALIGN);
         let end: Address = start.plus(space_size);
 
         let line_mark_table = LineMarkTable::new(start, end);
