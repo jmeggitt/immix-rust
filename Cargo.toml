@@ -24,7 +24,7 @@ mt-gcbench = ["mt-trace"]
 gcbench = ["mt-trace"]
 mark = []
 trace = []
-mt-trace = ["crossbeam"]
+mt-trace = []
 
 [dependencies]
 memmap2 = "0.5.3"
@@ -35,10 +35,8 @@ parking_lot = "0.12.0"
 generational-arena = "0.2.8"
 num_cpus = "1.13.1"
 memsec = "0.6.0"
+crossbeam = "0.8.1"
 
-[dependencies.crossbeam]
-version = "0.8.1"
-optional = true
 
 [dev-dependencies]
 criterion = "0.3.5"
