@@ -1,6 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use immix_rust::heap::immix::{ImmixMutatorLocal, ImmixSpace};
-use immix_rust::set_low_water_mark;
+use immix_rust::{set_low_water_mark, ImmixMutatorLocal, ImmixSpace};
 use std::alloc::Layout;
 use std::mem::size_of;
 use std::ptr::null_mut;
@@ -11,15 +10,6 @@ use std::time::{Duration, Instant};
 
 // Default space size of 1GB
 const IMMIX_SPACE_SIZE: usize = 1024 << 20;
-
-#[inline(always)]
-fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
-    let addr = mutator.alloc(Layout::new::<Node>());
-
-    // TODO: This may not be the correct encoding
-    mutator.init_object(addr, 0b1100_0011);
-    addr.to_ptr_mut::<Node>()
-}
 
 #[repr(C)] // Enforce field ordering
 struct Node {
