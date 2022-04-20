@@ -3,122 +3,13 @@ use crate::common::{Address, TraceMap};
 use crate::heap::gc;
 use crate::heap::immix;
 
-use crate::heap::immix::LineMark;
+use crate::heap::immix::line_mark::LineMark;
+use crate::heap::immix::line_mark::{LineMarkTable, LineMarkTableSlice};
+use crate::heap::immix::BlockMark;
 use crossbeam::deque::{Injector, Steal};
 use memmap2::{MmapMut, MmapOptions};
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::VecDeque;
 use std::*;
-
-// this table will be accessed through unsafe raw pointers. since Rust doesn't provide a data structure for such guarantees:
-// 1. Non-overlapping segments of this table may be accessed concurrently from different mutator threads
-// 2. One element may be written into at the same time by different gc threads during tracing
-
-#[derive(Clone)]
-pub struct LineMarkTable {
-    space_start: Address,
-    ptr: *mut immix::LineMark,
-    len: usize,
-}
-
-impl LineMarkTable {
-    pub fn new(space_start: Address, space_end: Address) -> LineMarkTable {
-        let line_mark_table_len = space_end.diff(space_start) / immix::BYTES_IN_LINE;
-        let line_mark_table = {
-            // TODO: This could likely be replaced with a Vec
-            let layout = Layout::array::<LineMark>(line_mark_table_len).unwrap();
-            let ret = unsafe { System.alloc(layout) as *mut immix::LineMark };
-            let mut cursor = ret;
-
-            for _ in 0..line_mark_table_len {
-                unsafe {
-                    *cursor = immix::LineMark::Free;
-                }
-                cursor = unsafe { cursor.offset(1) };
-            }
-
-            ret
-        };
-
-        LineMarkTable {
-            space_start,
-            ptr: line_mark_table,
-            len: line_mark_table_len,
-        }
-    }
-
-    pub fn take_slice(&mut self, start: usize, len: usize) -> LineMarkTableSlice {
-        LineMarkTableSlice {
-            ptr: unsafe { self.ptr.add(start) },
-            len,
-        }
-    }
-
-    #[inline(always)]
-    #[allow(dead_code)]
-    fn get(&self, index: usize) -> immix::LineMark {
-        debug_assert!(index <= self.len);
-        unsafe { *self.ptr.add(index) }
-    }
-
-    #[inline(always)]
-    fn set(&self, index: usize, value: immix::LineMark) {
-        debug_assert!(index <= self.len);
-        unsafe { *self.ptr.add(index) = value };
-    }
-
-    #[inline(always)]
-    pub fn mark_line_live(&self, addr: Address) {
-        let line_table_index = addr.diff(self.space_start) >> immix::LOG_BYTES_IN_LINE;
-
-        self.set(line_table_index, immix::LineMark::Live);
-
-        if line_table_index < self.len - 1 {
-            self.set(line_table_index + 1, immix::LineMark::ConservLive);
-        }
-    }
-
-    #[inline(always)]
-    pub fn mark_line_live2(&self, space_start: Address, addr: Address) {
-        let line_table_index = addr.diff(space_start) >> immix::LOG_BYTES_IN_LINE;
-
-        self.set(line_table_index, immix::LineMark::Live);
-
-        if line_table_index < self.len - 1 {
-            self.set(line_table_index + 1, immix::LineMark::ConservLive);
-        }
-    }
-}
-
-impl Drop for LineMarkTable {
-    fn drop(&mut self) {
-        let layout = Layout::array::<LineMark>(self.len).unwrap();
-        unsafe { System.dealloc(self.ptr as *mut u8, layout) }
-    }
-}
-
-#[derive(Clone)]
-pub struct LineMarkTableSlice {
-    ptr: *mut immix::LineMark,
-    len: usize,
-}
-
-impl LineMarkTableSlice {
-    #[inline(always)]
-    pub fn get(&self, index: usize) -> immix::LineMark {
-        debug_assert!(index <= self.len);
-        unsafe { *self.ptr.add(index) }
-    }
-    #[inline(always)]
-    pub fn set(&mut self, index: usize, value: immix::LineMark) {
-        debug_assert!(index <= self.len);
-        unsafe { *self.ptr.add(index) = value };
-    }
-    #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.len
-    }
-}
 
 #[repr(C)]
 pub struct ImmixSpace {
@@ -142,15 +33,6 @@ pub struct ImmixSpace {
     mmap: MmapMut,
     usable_blocks: Injector<Box<ImmixBlock>>,
     used_blocks: Injector<Box<ImmixBlock>>,
-}
-
-pub struct ImmixBlock {
-    id: usize,
-    state: immix::BlockMark,
-    start: Address,
-
-    // a segment of the big line mark table in ImmixSpace
-    line_mark_table: LineMarkTableSlice,
 }
 
 const SPACE_ALIGN: usize = 1 << 19;
@@ -251,11 +133,11 @@ impl ImmixSpace {
             {
                 let cur_line_mark_table = block.line_mark_table_mut();
                 for i in 0..cur_line_mark_table.len() {
-                    if cur_line_mark_table.get(i) != immix::LineMark::Live
-                        && cur_line_mark_table.get(i) != immix::LineMark::ConservLive
+                    if cur_line_mark_table.get(i) != LineMark::Live
+                        && cur_line_mark_table.get(i) != LineMark::ConservLive
                     {
                         has_free_lines = true;
-                        cur_line_mark_table.set(i, immix::LineMark::Free);
+                        cur_line_mark_table.set(i, LineMark::Free);
 
                         free_lines += 1;
                     }
@@ -265,13 +147,13 @@ impl ImmixSpace {
             }
 
             if has_free_lines {
-                block.set_state(immix::BlockMark::Usable);
+                block.set_state(BlockMark::Usable);
                 usable_blocks += 1;
 
                 // usable_blocks_lock.push_front(block);
                 self.usable_blocks.push(block);
             } else {
-                block.set_state(immix::BlockMark::Full);
+                block.set_state(BlockMark::Full);
                 full_blocks += 1;
                 live_blocks.push_front(block);
             }
@@ -316,35 +198,22 @@ impl ImmixSpace {
     }
 }
 
+pub struct ImmixBlock {
+    id: usize,
+    state: immix::BlockMark,
+    start: Address,
+
+    // a segment of the big line mark table in ImmixSpace
+    line_mark_table: LineMarkTableSlice,
+}
+
 impl ImmixBlock {
     pub fn get_next_available_line(&self, cur_line: usize) -> Option<usize> {
-        let mut i = cur_line;
-        while i < self.line_mark_table.len {
-            match self.line_mark_table.get(i) {
-                immix::LineMark::Free => {
-                    return Some(i);
-                }
-                _ => {
-                    i += 1;
-                }
-            }
-        }
-        None
+        self.line_mark_table.get_next_available_line(cur_line)
     }
 
     pub fn get_next_unavailable_line(&self, cur_line: usize) -> usize {
-        let mut i = cur_line;
-        while i < self.line_mark_table.len {
-            match self.line_mark_table.get(i) {
-                immix::LineMark::Free => {
-                    i += 1;
-                }
-                _ => {
-                    return i;
-                }
-            }
-        }
-        i
+        self.line_mark_table.get_next_unavailable_line(cur_line)
     }
 
     pub fn id(&self) -> usize {
@@ -389,7 +258,7 @@ impl fmt::Display for ImmixSpace {
         //        }
         //        write!(f, "\n}}\n").unwrap();
 
-        writeln!(f, "t_ptr={:?}", self.line_mark_table.ptr)?;
+        writeln!(f, "t_ptr={:?}", &self.line_mark_table)?;
         //        write!(f, "usable blocks:\n").unwrap();
         //        for b in self.usable_blocks.iter() {
         //            write!(f, "  {}\n", b).unwrap();
@@ -407,7 +276,7 @@ impl fmt::Display for ImmixBlock {
         write!(
             f,
             "ImmixBlock#{}(state={:?}, address={:#X}, line_table={:?}",
-            self.id, self.state, self.start, self.line_mark_table.ptr
+            self.id, self.state, self.start, &self.line_mark_table
         )?;
 
         write!(f, "[")?;

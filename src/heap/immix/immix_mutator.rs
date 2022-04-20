@@ -7,6 +7,7 @@ use log::trace;
 
 use crate::common::Address;
 
+use crate::heap::immix::line_mark::LineMark;
 use generational_arena::{Arena, Index};
 use parking_lot::RwLock;
 use std::alloc::Layout;
@@ -184,7 +185,7 @@ impl ImmixMutatorLocal {
                     for line in next_available_line..end_line {
                         self.block()
                             .line_mark_table_mut()
-                            .set(line, immix::LineMark::FreshAlloc);
+                            .set(line, LineMark::FreshAlloc);
                     }
 
                     self.alloc(layout)
