@@ -1,10 +1,8 @@
-use immix_rust::common::Address;
-use immix_rust::heap;
-use immix_rust::heap::immix::ImmixMutatorLocal;
-use immix_rust::heap::immix::ImmixSpace;
+// use immix_rust::Address;
+// use immix_rust::heap;
+use immix_rust::{Address, ImmixMutatorLocal, ImmixSpace};
 use std::alloc::Layout;
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -15,12 +13,8 @@ use crate::exhaust::OBJECT_SIZE;
 const TRACE_TIMES: usize = ALLOCATION_TIMES;
 
 #[allow(unused_variables)]
-pub fn alloc_trace() {
-    let shared_space: Arc<ImmixSpace> = {
-        let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
-
-        Arc::new(space)
-    };
+pub fn alloc_trace(space_size: usize) {
+    let shared_space = Arc::new(ImmixSpace::new(space_size));
 
     let mut mutator = ImmixMutatorLocal::new(shared_space.clone());
 
@@ -48,7 +42,7 @@ pub fn alloc_trace() {
         mutator.init_object(res, 0b1100_0001);
 
         // set prev's 1st field (offset 0) to this object
-        unsafe { prev.store::<Address>(res) };
+        unsafe { *prev.to_ptr_mut::<Address>() = res };
 
         prev = res;
     }
@@ -57,13 +51,15 @@ pub fn alloc_trace() {
 }
 
 #[inline(never)]
-fn trace_loop(root: Address, shared_space: Arc<ImmixSpace>) {
+fn trace_loop(root: Address, _shared_space: Arc<ImmixSpace>) {
     println!("Start tracing");
-    let mut roots = vec![unsafe { root.to_object_reference() }];
+    let roots = vec![unsafe { root.to_object_reference() }];
 
     let time_start = Instant::now();
 
-    heap::gc::start_trace(&mut roots, shared_space);
+    // TODO: Fix this
+    // heap::gc::start_trace(&mut roots, shared_space);
+    println!("{:?}", roots);
 
     let elapsed = time_start.elapsed();
 

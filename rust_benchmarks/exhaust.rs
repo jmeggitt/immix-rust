@@ -1,6 +1,7 @@
-use immix_rust::heap;
-use immix_rust::heap::immix::ImmixMutatorLocal;
-use immix_rust::heap::immix::ImmixSpace;
+// use immix_rust::heap;
+// use immix_rust::heap::immix::ImmixMutatorLocal;
+// use immix_rust::heap::immix::ImmixSpace;
+use immix_rust::{ImmixMutatorLocal, ImmixSpace};
 use std::alloc::Layout;
 
 use std::time::Instant;
@@ -10,15 +11,10 @@ pub const OBJECT_ALIGN: usize = 8;
 
 pub const ALLOCATION_TIMES: usize = 50000000;
 
-pub fn exhaust_alloc() {
-    use std::sync::atomic::Ordering;
+pub fn exhaust_alloc(space_size: usize) {
     use std::sync::Arc;
 
-    let shared_space: Arc<ImmixSpace> = {
-        let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
-
-        Arc::new(space)
-    };
+    let shared_space = Arc::new(ImmixSpace::new(space_size));
 
     let mut mutator = ImmixMutatorLocal::new(shared_space);
 
@@ -34,7 +30,7 @@ pub fn exhaust_alloc() {
     println!(
         "This would take {} bytes of {} bytes heap",
         ALLOCATION_TIMES * ACTUAL_OBJECT_SIZE,
-        heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst)
+        space_size
     );
 
     alloc_loop(&mut mutator);

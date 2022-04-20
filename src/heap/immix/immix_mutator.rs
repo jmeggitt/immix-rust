@@ -6,11 +6,11 @@ use lazy_static::lazy_static;
 use log::trace;
 
 use crate::common::Address;
-use crate::common::LOG_POINTER_SIZE;
 
 use generational_arena::{Arena, Index};
 use parking_lot::RwLock;
 use std::alloc::Layout;
+use std::mem::size_of;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::*;
@@ -52,11 +52,16 @@ pub struct ImmixMutatorGlobal {
 }
 
 impl ImmixMutatorLocal {
+    pub fn request_gc(&mut self) {
+        gc::trigger_gc();
+        self.yieldpoint();
+    }
+
     pub fn reset(&mut self) {
         unsafe {
             // should not use Address::zero() other than initialization
-            self.cursor = Address::zero();
-            self.limit = Address::zero();
+            self.cursor = Address::null();
+            self.limit = Address::null();
         }
         self.line = immix::LINES_IN_BLOCK;
 
@@ -72,8 +77,8 @@ impl ImmixMutatorLocal {
 
         ImmixMutatorLocal {
             id,
-            cursor: unsafe { Address::zero() },
-            limit: unsafe { Address::zero() },
+            cursor: unsafe { Address::null() },
+            limit: unsafe { Address::null() },
             line: immix::LINES_IN_BLOCK,
             block: None,
             alloc_map: space.alloc_map.ptr,
@@ -135,7 +140,7 @@ impl ImmixMutatorLocal {
         unsafe {
             *self
                 .alloc_map
-                .add(addr.diff(self.space_start) >> LOG_POINTER_SIZE) = encode;
+                .add(addr.diff(self.space_start) / size_of::<*mut ()>()) = encode;
         }
     }
 
@@ -248,7 +253,7 @@ impl ImmixMutatorLocal {
         let mut cur_addr = obj;
         while cur_addr < obj.plus(length) {
             println!("Address: {:#X}   {:#X}", cur_addr, unsafe {
-                cur_addr.load::<u64>()
+                *cur_addr.to_ptr::<u64>()
             });
             cur_addr = cur_addr.plus(8);
         }
@@ -284,7 +289,7 @@ impl ImmixMutatorGlobal {
 
 impl fmt::Display for ImmixMutatorLocal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.cursor.is_zero() {
+        if self.cursor.to_ptr::<()>().is_null() {
             write!(f, "Mutator (not initialized)")
         } else {
             writeln!(f, "Mutator:")?;

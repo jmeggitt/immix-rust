@@ -1,7 +1,5 @@
-use immix_rust::common::Address;
-use immix_rust::heap;
-use immix_rust::heap::immix::ImmixMutatorLocal;
-use immix_rust::heap::immix::ImmixSpace;
+use immix_rust::{Address, ImmixMutatorLocal, ImmixSpace};
+
 use std::alloc::Layout;
 use std::time::Instant;
 
@@ -35,7 +33,7 @@ fn make_tree(depth: usize, mutator: &mut ImmixMutatorLocal) -> Address {
         for _ in 0..K {
             let child = children.pop().unwrap();
             //            println!("  child: {:X} at {:X}", child, cursor);
-            unsafe { cursor.store::<Address>(child) };
+            unsafe { *cursor.to_ptr_mut::<Address>() = child };
             cursor = cursor.plus(8);
         }
 
@@ -44,16 +42,12 @@ fn make_tree(depth: usize, mutator: &mut ImmixMutatorLocal) -> Address {
 }
 
 #[allow(unused_variables)]
-pub fn alloc_trace() {
-    use std::sync::atomic::Ordering;
+pub fn alloc_trace(space_size: usize) {
     use std::sync::Arc;
 
-    let shared_space: Arc<ImmixSpace> = {
-        let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
+    let shared_space = Arc::new(ImmixSpace::new(space_size));
 
-        Arc::new(space)
-    };
-    let mut mutator = ImmixMutatorLocal::new(shared_space.clone());
+    let mut mutator = ImmixMutatorLocal::new(shared_space);
 
     println!(
         "Trying to allocate 1 object of (size {}, align {}). ",
@@ -82,7 +76,11 @@ pub fn alloc_trace() {
     println!("Start tracing");
 
     let time_start = Instant::now();
-    heap::gc::start_trace(&mut roots, shared_space);
+
+    // TODO: Fix this
+    // heap::gc::start_trace(&mut roots, shared_space);
+    println!("{:?}", roots);
+
     let elapsed = time_start.elapsed();
 
     println!("time used: {:?}", elapsed);

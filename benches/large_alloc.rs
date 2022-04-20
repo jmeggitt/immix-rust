@@ -1,3 +1,6 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use immix_rust::heap::immix::{ImmixMutatorLocal, ImmixSpace};
+use immix_rust::set_low_water_mark;
 use std::alloc::Layout;
 use std::mem::size_of;
 use std::ptr::null_mut;
@@ -5,9 +8,6 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use immix_rust::heap::immix::{ImmixMutatorLocal, ImmixSpace};
-use immix_rust::set_low_water_mark;
 
 // Default space size of 1GB
 const IMMIX_SPACE_SIZE: usize = 1024 << 20;
@@ -30,7 +30,6 @@ struct Node {
 }
 
 impl Node {
-
     pub fn space_required(depth: usize) -> usize {
         size_of::<Self>() * ((1 << depth) - 1)
     }
@@ -51,7 +50,7 @@ impl Node {
     #[inline] // Use inline hint to hopefully unroll a few recursions of the function
     pub fn build_bottom_up(depth: usize, mutator: &mut ImmixMutatorLocal) -> *mut Self {
         if depth == 0 {
-            return null_mut()
+            return null_mut();
         }
 
         let left = Self::build_bottom_up(depth - 1, mutator);
@@ -69,7 +68,7 @@ impl Node {
     #[inline] // Use inline hint to hopefully unroll a few recursions of the function
     pub fn build_top_down(depth: usize, mutator: &mut ImmixMutatorLocal) -> *mut Self {
         if depth == 0 {
-            return null_mut()
+            return null_mut();
         }
 
         let node = Self::alloc(mutator);
@@ -82,10 +81,13 @@ impl Node {
     }
 }
 
-fn bench_build_tree(iters: usize, depth: usize, approach: fn(usize, &mut ImmixMutatorLocal) -> *mut Node) -> Duration {
+fn bench_build_tree(
+    iters: usize,
+    depth: usize,
+    approach: fn(usize, &mut ImmixMutatorLocal) -> *mut Node,
+) -> Duration {
     set_low_water_mark();
     let immix_space = Arc::new(ImmixSpace::new(IMMIX_SPACE_SIZE));
-
 
     let mut join_handles = Vec::with_capacity(num_cpus::get());
     let start_barrier = Arc::new(Barrier::new(num_cpus::get()));
@@ -113,7 +115,8 @@ fn bench_build_tree(iters: usize, depth: usize, approach: fn(usize, &mut ImmixMu
     }
 
     let mut total_duration = Duration::from_secs(0);
-    join_handles.drain(..)
+    join_handles
+        .drain(..)
         .map(JoinHandle::join)
         .map(Result::unwrap)
         .for_each(|x| total_duration += x);
@@ -121,7 +124,6 @@ fn bench_build_tree(iters: usize, depth: usize, approach: fn(usize, &mut ImmixMu
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-
     println!("Space Requirements:");
     for depth in 0..40 {
         let space = num_cpus::get() * Node::space_required(depth);
@@ -132,34 +134,51 @@ fn criterion_benchmark(c: &mut Criterion) {
             println!("\t{}:\t{} MB", depth, (space + (1 << 20) - 1) >> 20);
         } else if space > 8 << 10 {
             println!("\t{}:\t{} KB", depth, (space + (1 << 10) - 1) >> 10);
-        } else  {
+        } else {
             println!("\t{}:\t{} B", depth, space);
         }
     }
 
     let mut tree_group = c.benchmark_group("tree");
 
-    tree_group.bench_function("GC(depth 4)", move |b| b.iter_custom(|iters| {
-        println!("Preparing to do {} iters", iters);
-        bench_build_tree(Node::iters_to_reach_gc(4, 3 * iters as usize) + 1, 4, Node::build_top_down)
-    }));
-    tree_group.bench_function("GC(depth 8)", move |b| b.iter_custom(|iters| {
-        println!("Preparing to do {} iters of depth 8", iters);
-        bench_build_tree(Node::iters_to_reach_gc(8, 3 * iters as usize) + 1, 8, Node::build_top_down)
-    }));
-    tree_group.bench_function("GC(depth 16)", move |b| b.iter_custom(|iters| {
-        println!("Preparing to do {} iters of depth 16", iters);
-        bench_build_tree(Node::iters_to_reach_gc(16, 3 * iters as usize) + 1, 16, Node::build_top_down)
-    }));
+    tree_group.bench_function("GC(depth 4)", move |b| {
+        b.iter_custom(|iters| {
+            println!("Preparing to do {} iters", iters);
+            bench_build_tree(
+                Node::iters_to_reach_gc(4, 3 * iters as usize) + 1,
+                4,
+                Node::build_top_down,
+            )
+        })
+    });
+    tree_group.bench_function("GC(depth 8)", move |b| {
+        b.iter_custom(|iters| {
+            println!("Preparing to do {} iters of depth 8", iters);
+            bench_build_tree(
+                Node::iters_to_reach_gc(8, 3 * iters as usize) + 1,
+                8,
+                Node::build_top_down,
+            )
+        })
+    });
+    tree_group.bench_function("GC(depth 16)", move |b| {
+        b.iter_custom(|iters| {
+            println!("Preparing to do {} iters of depth 16", iters);
+            bench_build_tree(
+                Node::iters_to_reach_gc(16, 3 * iters as usize) + 1,
+                16,
+                Node::build_top_down,
+            )
+        })
+    });
 
+    tree_group.bench_function("top_down(19)", move |b| {
+        b.iter_custom(|iters| bench_build_tree(iters as usize, 19, Node::build_top_down))
+    });
 
-    tree_group.bench_function("top_down(19)", move |b| b.iter_custom(|iters| {
-        bench_build_tree(iters as usize, 19, Node::build_top_down)
-    }));
-
-    tree_group.bench_function("bottom_up(19)", move |b| b.iter_custom(|iters| {
-        bench_build_tree(iters as usize, 19, Node::build_bottom_up)
-    }));
+    tree_group.bench_function("bottom_up(19)", move |b| {
+        b.iter_custom(|iters| bench_build_tree(iters as usize, 19, Node::build_bottom_up))
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);

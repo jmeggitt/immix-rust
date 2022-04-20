@@ -2,9 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use immix_rust::heap;
-use immix_rust::heap::immix::ImmixMutatorLocal;
-use immix_rust::heap::immix::ImmixSpace;
+use immix_rust::{gc_count, set_low_water_mark, ImmixMutatorLocal, ImmixSpace};
 use std::alloc::Layout;
 use std::mem::size_of;
 use std::time::Instant;
@@ -98,16 +96,13 @@ fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
     addr.to_ptr_mut::<Node>()
 }
 
-pub fn start() {
-    use std::sync::atomic::Ordering;
+pub fn start(space_size: usize) {
     use std::sync::Arc;
 
-    heap::gc::set_low_water_mark();
+    set_low_water_mark();
 
-    let immix_space: Arc<ImmixSpace> = {
-        let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
-        Arc::new(space)
-    };
+    let immix_space = Arc::new(ImmixSpace::new(space_size));
+
     let mut mutator = ImmixMutatorLocal::new(immix_space);
 
     println!("Garbage Collector Test");
@@ -159,5 +154,5 @@ pub fn start() {
 
     PrintDiagnostics();
     println!("Completed in {:?}", elapsed);
-    println!("Finished with {} collections", heap::gc::gc_count());
+    println!("Finished with {} collections", gc_count());
 }

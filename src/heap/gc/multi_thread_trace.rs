@@ -1,4 +1,4 @@
-use crate::{common, objectmodel, ImmixSpace, ObjectReference};
+use crate::{objectmodel, ImmixSpace, ObjectReference};
 use crossbeam::deque::Injector;
 use crossbeam::deque::{Steal, Worker};
 use std::hint::spin_loop;
@@ -79,13 +79,13 @@ fn worker_batch_steal_trace(
         loop {
             let value = unsafe { objectmodel::get_ref_byte(alloc_map, space_start, next) };
             let (ref_bits, short_encode) = (
-                common::lower_bits(value, objectmodel::REF_BITS_LEN),
-                common::test_nth_bit(value, objectmodel::SHORT_ENCODE_BIT),
+                value & ((1 << objectmodel::REF_BITS_LEN) - 1),
+                value & (1 << objectmodel::SHORT_ENCODE_BIT) != 0,
             );
             macro_rules! steal_process_edge {
                     ($($offset:literal)+) => {{$(
-                        let obj_addr = unsafe { base.plus($offset).load::<ObjectReference>() };
-                        if trace_map.is_untraced_and_valid(obj_addr.value() as *const ()) {
+                        let obj_addr = unsafe { *base.plus($offset).to_ptr::<ObjectReference>() };
+                        if trace_map.is_untraced_and_valid(obj_addr.as_usize() as *const ()) {
                             injector.push(obj_addr);
                         }
                     )+}};

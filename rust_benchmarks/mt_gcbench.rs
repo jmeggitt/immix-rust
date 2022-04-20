@@ -4,13 +4,11 @@
 #![allow(unused_variables)]
 
 use std::alloc::Layout;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
 
-use immix_rust::heap;
-use immix_rust::heap::immix::ImmixMutatorLocal;
-use immix_rust::heap::immix::ImmixSpace;
+use immix_rust::{gc_count, set_low_water_mark, ImmixMutatorLocal, ImmixSpace};
+
 use std::mem::size_of;
 
 const kStretchTreeDepth: usize = 18;
@@ -91,7 +89,7 @@ fn TimeConstruction(depth: usize, mutator: &mut ImmixMutatorLocal) {
 }
 
 fn run_one_test(immix_space: Arc<ImmixSpace>) {
-    heap::gc::set_low_water_mark();
+    set_low_water_mark();
     let mut mutator = ImmixMutatorLocal::new(immix_space);
 
     println!(
@@ -120,15 +118,12 @@ fn alloc(mutator: &mut ImmixMutatorLocal) -> *mut Node {
 
 use std::time::Instant;
 
-pub fn start() {
-    heap::gc::set_low_water_mark();
+pub fn start(space_size: usize) {
+    set_low_water_mark();
 
     let n_threads: usize = num_cpus::get();
 
-    let immix_space: Arc<ImmixSpace> = {
-        let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
-        Arc::new(space)
-    };
+    let immix_space = Arc::new(ImmixSpace::new(space_size));
 
     // let mut mutator = ImmixMutatorLocal::new(immix_space.clone());
 
@@ -184,5 +179,5 @@ pub fn start() {
     let elapsed = time_start.elapsed();
 
     println!("Completed in {:?}", elapsed);
-    println!("Finished with {} collections", heap::gc::gc_count());
+    println!("Finished with {} collections", gc_count());
 }

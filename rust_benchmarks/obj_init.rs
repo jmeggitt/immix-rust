@@ -1,10 +1,6 @@
-use immix_rust::common::Address;
-use immix_rust::heap;
-use immix_rust::heap::immix::ImmixMutatorLocal;
-use immix_rust::heap::immix::ImmixSpace;
+use immix_rust::{Address, ImmixMutatorLocal, ImmixSpace};
 use std::alloc::Layout;
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -15,12 +11,8 @@ use crate::exhaust::OBJECT_SIZE;
 const INIT_TIMES: usize = ALLOCATION_TIMES;
 
 #[allow(unused_variables)]
-pub fn alloc_init() {
-    let shared_space: Arc<ImmixSpace> = {
-        let space: ImmixSpace = ImmixSpace::new(heap::IMMIX_SPACE_SIZE.load(Ordering::SeqCst));
-
-        Arc::new(space)
-    };
+pub fn alloc_init(space_size: usize) {
+    let shared_space = Arc::new(ImmixSpace::new(space_size));
 
     let mut mutator = ImmixMutatorLocal::new(shared_space);
 

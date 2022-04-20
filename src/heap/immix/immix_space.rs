@@ -5,10 +5,10 @@ use crate::heap::immix;
 
 use crate::heap::immix::LineMark;
 use crossbeam::deque::{Injector, Steal};
+use memmap2::{MmapMut, MmapOptions};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::VecDeque;
 use std::*;
-use memmap2::{MmapMut, MmapOptions};
 
 // this table will be accessed through unsafe raw pointers. since Rust doesn't provide a data structure for such guarantees:
 // 1. Non-overlapping segments of this table may be accessed concurrently from different mutator threads

@@ -4,9 +4,9 @@ use crate::heap::immix::MUTATORS;
 use crate::heap::immix::N_MUTATORS;
 use crate::objectmodel;
 use std::arch::asm;
+use std::mem::size_of;
 use std::ptr::null_mut;
 
-use crate::common;
 use crate::common::AddressMap;
 use crate::common::{Address, ObjectReference};
 
@@ -73,7 +73,7 @@ fn is_valid_object(addr: Address, start: Address, end: Address, live_map: &Addre
         return false;
     }
 
-    common::test_nth_bit(live_map.get(addr), objectmodel::OBJ_START_BIT)
+    live_map.get(addr) & (1 << objectmodel::OBJ_START_BIT) != 0
 }
 
 fn stack_scan(immix_space: &ImmixSpace) -> Vec<ObjectReference> {
@@ -84,7 +84,7 @@ fn stack_scan(immix_space: &ImmixSpace) -> Vec<ObjectReference> {
     let mut ret = vec![];
 
     while cursor < low_water_mark {
-        let value: Address = unsafe { cursor.load::<Address>() };
+        let value: Address = unsafe { *cursor.to_ptr::<Address>() };
 
         if is_valid_object(
             value,
@@ -95,7 +95,7 @@ fn stack_scan(immix_space: &ImmixSpace) -> Vec<ObjectReference> {
             ret.push(unsafe { value.to_object_reference() });
         }
 
-        cursor = cursor.plus(common::POINTER_SIZE);
+        cursor = cursor.plus(size_of::<*mut ()>());
     }
 
     let roots_from_stack = ret.len();

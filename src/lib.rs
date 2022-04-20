@@ -3,21 +3,20 @@
 
 use lazy_static::lazy_static;
 use std::alloc::Layout;
-use std::sync::atomic::Ordering;
 
-pub mod common;
-pub mod heap;
-pub mod objectmodel;
+mod common;
+mod heap;
+mod objectmodel;
 
-use common::ObjectReference;
-use heap::immix::ImmixMutatorLocal;
-use heap::immix::ImmixSpace;
 use parking_lot::RwLock;
 use std::boxed::Box;
 use std::sync::Arc;
 
-pub use heap::gc::set_low_water_mark;
-pub use heap::immix::ImmixMutatorLocal as Mutator;
+pub use heap::gc::{gc_count, set_low_water_mark};
+
+// Items with must be re-exported
+pub use common::{Address, ObjectReference};
+pub use heap::immix::{ImmixMutatorLocal, ImmixSpace};
 
 #[repr(C)]
 pub struct GC {
@@ -34,9 +33,6 @@ pub extern "C" fn gc_init(immix_size: usize, lo_size: usize) {
     // set this line to turn on certain level of debugging info
     //    simple_logger::init_with_level(log::LogLevel::Trace).ok();
 
-    // init space size
-    heap::IMMIX_SPACE_SIZE.store(immix_size, Ordering::SeqCst);
-
     let immix_space = Arc::new(ImmixSpace::new(immix_size));
 
     *MY_GC.write() = Some(GC { immix_space });
@@ -46,9 +42,6 @@ pub extern "C" fn gc_init(immix_size: usize, lo_size: usize) {
         immix_size,
         lo_size
     );
-
-    // init object model
-    // objectmodel::init();
 }
 
 #[no_mangle]
